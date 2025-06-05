@@ -2,7 +2,7 @@ from fastapi import APIRouter, HTTPException, status, Depends, Response, Request
 from fastapi.security import HTTPAuthorizationCredentials
 from fastapi.responses import RedirectResponse
 from datetime import datetime
-from models import UserCreate, UserLogin, UserResponse, UserInDB
+from models import UserCreate, UserLogin, UserResponse, UserInDB, ChangePasswordRequest, ProfileUpdateRequest
 from pydantic import BaseModel
 import httpx
 from google.auth.transport import requests
@@ -14,12 +14,14 @@ class LoginResponse(BaseModel):
     access_token: str
     token_type: str
     expires_in: int
+    user: UserResponse
     message: str
 
 class RefreshResponse(BaseModel):
     access_token: str
     token_type: str
     expires_in: int
+    user: UserResponse
     message: str
     
 from auth import (
@@ -30,6 +32,7 @@ from auth import (
     get_current_user,
     verify_token,
     get_user_by_email,
+    verify_password,
     security
 )
 from database import get_database
@@ -63,6 +66,12 @@ async def register(user: UserCreate):
         "username": user.username,
         "email": user.email,
         "password_hash": hashed_password,
+        "full_name": user.full_name,
+        "bio": None,
+        "profile_picture": None,
+        "google_id": None,
+        "is_active": True,
+        "role": "user",
         "refresh_token": None,
         "created_at": datetime.utcnow()
     }
@@ -74,7 +83,14 @@ async def register(user: UserCreate):
         "_id": str(result.inserted_id),
         "username": user.username,
         "email": user.email,
-        "created_at": user_dict["created_at"]
+        "full_name": user.full_name,
+        "bio": None,
+        "profile_picture": None,
+        "google_id": None,
+        "is_active": True,
+        "role": "user",
+        "created_at": user_dict["created_at"],
+        "has_password": True  # Regular users have passwords
     }
     
     return UserResponse(**response_dict)
@@ -110,10 +126,21 @@ async def login(user_credentials: UserLogin, response: Response):
         path="/api/v1/auth"  # Restrict cookie to auth endpoints only
     )
     
+    # Prepare user response
+    user_data = user.dict()
+    user_data["has_password"] = bool(user.password_hash)
+    # Ensure all required fields are present
+    user_data.setdefault("full_name", None)
+    user_data.setdefault("bio", None)
+    user_data.setdefault("is_active", True)
+    user_data.setdefault("role", "user")
+    user_response = UserResponse(**user_data)
+    
     return LoginResponse(
         access_token=access_token,
         token_type="bearer",
         expires_in=settings.ACCESS_TOKEN_EXPIRE_MINUTES * 60,
+        user=user_response,
         message="Login successful"
     )
 
@@ -166,10 +193,21 @@ async def refresh_token(request: Request, response: Response):
             path="/api/v1/auth"
         )
         
+        # Prepare user response
+        user_data = user.dict()
+        user_data["has_password"] = bool(user.password_hash)
+        # Ensure all required fields are present
+        user_data.setdefault("full_name", None)
+        user_data.setdefault("bio", None)
+        user_data.setdefault("is_active", True)
+        user_data.setdefault("role", "user")
+        user_response = UserResponse(**user_data)
+        
         return RefreshResponse(
             access_token=access_token,
             token_type="bearer",
             expires_in=settings.ACCESS_TOKEN_EXPIRE_MINUTES * 60,
+            user=user_response,
             message="Token refreshed successfully"
         )
     
@@ -202,7 +240,146 @@ async def logout(request: Request, response: Response, current_user: UserInDB = 
 
 @router.get("/me", response_model=UserResponse)
 async def read_users_me(current_user: UserInDB = Depends(get_current_user)):
-    return UserResponse(**current_user.dict())
+    # Create user response with all profile fields
+    user_data = current_user.dict()
+    user_data["has_password"] = bool(current_user.password_hash)
+    # Ensure all required fields are present
+    user_data.setdefault("full_name", None)
+    user_data.setdefault("bio", None)
+    user_data.setdefault("is_active", True)
+    user_data.setdefault("role", "user")
+    return UserResponse(**user_data)
+
+@router.post("/change-password")
+async def change_password(
+    password_data: ChangePasswordRequest,
+    current_user: UserInDB = Depends(get_current_user)
+):
+    """Change user password"""
+    # Check if passwords match
+    if password_data.new_password != password_data.confirm_password:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="New password and confirmation password do not match"
+        )
+    
+    # Check if user has a password (OAuth users might not have one)
+    if not current_user.password_hash:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Cannot change password for OAuth accounts"
+        )
+    
+    # Verify current password
+    if not verify_password(password_data.current_password, current_user.password_hash):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Current password is incorrect"
+        )
+    
+    # Hash new password
+    new_password_hash = get_password_hash(password_data.new_password)
+    
+    # Update password in database
+    db = await get_database()
+    result = await db.users.update_one(
+        {"_id": ObjectId(current_user.id)},
+        {"$set": {"password_hash": new_password_hash}}
+    )
+    
+    if result.modified_count == 0:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to update password"
+        )
+    
+    return {"message": "Password changed successfully"}
+
+@router.put("/profile", response_model=UserResponse)
+async def update_profile(
+    profile_data: ProfileUpdateRequest,
+    current_user: UserInDB = Depends(get_current_user)
+):
+    """Update user profile information"""
+    db = await get_database()
+    update_fields = {}
+    
+    # Check what fields need to be updated
+    if profile_data.username is not None:
+        # Check if username is already taken by another user
+        existing_user = await db.users.find_one({
+            "username": profile_data.username,
+            "_id": {"$ne": ObjectId(current_user.id)}
+        })
+        if existing_user:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Username already taken"
+            )
+        update_fields["username"] = profile_data.username
+    
+    if profile_data.email is not None:
+        # Check if email is already taken by another user
+        existing_user = await db.users.find_one({
+            "email": profile_data.email,
+            "_id": {"$ne": ObjectId(current_user.id)}
+        })
+        if existing_user:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Email already registered"
+            )
+        update_fields["email"] = profile_data.email
+    
+    if profile_data.full_name is not None:
+        update_fields["full_name"] = profile_data.full_name
+    
+    if profile_data.bio is not None:
+        update_fields["bio"] = profile_data.bio
+    
+    if profile_data.profile_picture is not None:
+        update_fields["profile_picture"] = profile_data.profile_picture
+    
+    # If no fields to update, return current user
+    if not update_fields:
+        user_data = current_user.dict()
+        user_data["has_password"] = bool(current_user.password_hash)
+        # Ensure all required fields are present
+        user_data.setdefault("full_name", None)
+        user_data.setdefault("bio", None)
+        user_data.setdefault("is_active", True)
+        user_data.setdefault("role", "user")
+        return UserResponse(**user_data)
+    
+    # Update user in database
+    result = await db.users.update_one(
+        {"_id": ObjectId(current_user.id)},
+        {"$set": update_fields}
+    )
+    
+    if result.modified_count == 0:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to update profile"
+        )
+    
+    # Fetch updated user data
+    updated_user = await get_user_by_email(current_user.email if profile_data.email is None else profile_data.email)
+    if not updated_user:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to fetch updated user data"
+        )
+    
+    # Return updated user response
+    user_data = updated_user.dict()
+    user_data["has_password"] = bool(updated_user.password_hash)
+    # Ensure all required fields are present
+    user_data.setdefault("full_name", None)
+    user_data.setdefault("bio", None)
+    user_data.setdefault("is_active", True)
+    user_data.setdefault("role", "user")
+    return UserResponse(**user_data)
 
 # Google OAuth2 Models
 class GoogleAuthRequest(BaseModel):
@@ -289,8 +466,12 @@ async def google_login(google_request: GoogleAuthRequest, response: Response):
                 "username": username,
                 "email": email,
                 "password_hash": None,  # No password for OAuth users
+                "full_name": name if name else None,
+                "bio": None,
                 "google_id": google_user_id,
                 "profile_picture": picture,
+                "is_active": True,
+                "role": "user",
                 "refresh_token": None,
                 "created_at": datetime.utcnow()
             }
@@ -304,7 +485,8 @@ async def google_login(google_request: GoogleAuthRequest, response: Response):
                 {"_id": user_doc["_id"]},
                 {"$set": {
                     "google_id": google_user_id,
-                    "profile_picture": picture
+                    "profile_picture": picture,
+                    "full_name": name if name else user_doc.get("full_name")
                 }}
             )
         
@@ -334,7 +516,14 @@ async def google_login(google_request: GoogleAuthRequest, response: Response):
             _id=str(user_doc["_id"]),
             username=user_doc["username"],
             email=user_doc["email"],
-            created_at=user_doc["created_at"]
+            full_name=user_doc.get("full_name"),
+            bio=user_doc.get("bio"),
+            profile_picture=user_doc.get("profile_picture"),
+            google_id=user_doc.get("google_id"),
+            is_active=user_doc.get("is_active", True),
+            role=user_doc.get("role", "user"),
+            created_at=user_doc["created_at"],
+            has_password=bool(user_doc.get("password_hash"))
         )
         
         return GoogleLoginResponse(

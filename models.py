@@ -11,6 +11,7 @@ class UserCreate(BaseModel):
     username: str = Field(..., min_length=3, max_length=20)
     email: EmailStr
     password: str = Field(..., min_length=6)
+    full_name: Optional[str] = None
 
 class UserLogin(BaseModel):
     email: EmailStr
@@ -20,7 +21,14 @@ class UserResponse(BaseModel):
     id: PyObjectId = Field(alias="_id")
     username: str
     email: EmailStr
+    full_name: Optional[str] = None
+    bio: Optional[str] = None
+    profile_picture: Optional[str] = None
+    google_id: Optional[str] = None
     created_at: datetime
+    has_password: bool = False  # Indicates if user can change password
+    is_active: bool = True
+    role: str = "user"
     
     model_config = ConfigDict(
         populate_by_name=True,
@@ -32,9 +40,15 @@ class UserInDB(BaseModel):
     id: PyObjectId = Field(alias="_id")
     username: str
     email: EmailStr
-    password_hash: str
+    full_name: Optional[str] = None
+    bio: Optional[str] = None
+    password_hash: Optional[str] = None  # OAuth users might not have password
     refresh_token: Optional[str] = None
+    profile_picture: Optional[str] = None
+    google_id: Optional[str] = None
     created_at: datetime
+    is_active: bool = True
+    role: str = "user"
     
     model_config = ConfigDict(
         populate_by_name=True,
@@ -197,4 +211,17 @@ class Token(BaseModel):
 
 class TokenData(BaseModel):
     email: Optional[str] = None
+
+# Profile and Password Management Models
+class ChangePasswordRequest(BaseModel):
+    current_password: str
+    new_password: str = Field(..., min_length=6)
+    confirm_password: str = Field(..., min_length=6)
+
+class ProfileUpdateRequest(BaseModel):
+    username: Optional[str] = Field(None, min_length=3, max_length=20)
+    email: Optional[EmailStr] = None
+    full_name: Optional[str] = None
+    bio: Optional[str] = None
+    profile_picture: Optional[str] = None
 
