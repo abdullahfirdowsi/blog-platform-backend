@@ -30,11 +30,41 @@ app = FastAPI(
 # Add CORS middleware
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # In production, replace with specific domains
+    allow_origins=[
+        "http://localhost:4200",  # Angular development server
+        "http://127.0.0.1:4200",  # Alternative localhost
+        "http://localhost:3000",  # In case you switch to React
+    ],
     allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_methods=["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
+    allow_headers=[
+        "Authorization", 
+        "Content-Type", 
+        "Accept", 
+        "Origin", 
+        "X-Requested-With",
+        "Access-Control-Request-Method",
+        "Access-Control-Request-Headers",
+        "Cross-Origin-Opener-Policy",
+        "Cross-Origin-Embedder-Policy"
+    ],
+    expose_headers=[
+        "Set-Cookie",
+        "Cross-Origin-Opener-Policy",
+        "Cross-Origin-Embedder-Policy"
+    ]
 )
+
+# Add custom middleware for Google OAuth headers
+@app.middleware("http")
+async def add_oauth_headers(request, call_next):
+    response = await call_next(request)
+    
+    # Add headers needed for Google OAuth
+    response.headers["Cross-Origin-Opener-Policy"] = "same-origin-allow-popups"
+    response.headers["Cross-Origin-Embedder-Policy"] = "unsafe-none"
+    
+    return response
 
 # Include routers
 app.include_router(auth_router, prefix="/api/v1")

@@ -12,4 +12,8 @@ email-validator
 scikit-learn
 numpy
 nltk
+httpx
+google-auth
+google-auth-oauthlib
+google-auth-httplib2
 
