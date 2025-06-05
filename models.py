@@ -67,6 +67,7 @@ class BlogResponse(BaseModel):
     published: bool
     created_at: datetime
     updated_at: datetime
+    tags: Optional[List[str]] = []  # To store tag names for TF-IDF
     
     model_config = ConfigDict(
         populate_by_name=True,
@@ -96,7 +97,7 @@ class CommentCreate(BaseModel):
     text: str = Field(..., min_length=1, max_length=500)
 
 class CommentResponse(BaseModel):
-    id: PyObjectId = Field(default_factory=PyObjectId, alias="_id")
+    id: PyObjectId = Field(alias="_id")
     blog_id: PyObjectId
     user_id: PyObjectId
     text: str
@@ -113,7 +114,7 @@ class LikeCreate(BaseModel):
     isLiked: bool = True
 
 class LikeResponse(BaseModel):
-    id: PyObjectId = Field(default_factory=PyObjectId, alias="_id")
+    id: PyObjectId = Field(alias="_id")
     blog_id: PyObjectId
     user_id: PyObjectId
     isLiked: bool
@@ -129,7 +130,7 @@ class TagCreate(BaseModel):
     name: str = Field(..., min_length=1, max_length=50)
 
 class TagResponse(BaseModel):
-    id: PyObjectId = Field(default_factory=PyObjectId, alias="_id")
+    id: PyObjectId = Field(alias="_id")
     name: str
     
     model_config = ConfigDict(
@@ -143,7 +144,7 @@ class ImageCreate(BaseModel):
     image_url: List[str]
 
 class ImageResponse(BaseModel):
-    id: PyObjectId = Field(default_factory=PyObjectId, alias="_id")
+    id: PyObjectId = Field(alias="_id")
     blog_id: PyObjectId
     image_url: List[str]
     uploaded_at: datetime
@@ -153,6 +154,40 @@ class ImageResponse(BaseModel):
         arbitrary_types_allowed=True,
         json_encoders={ObjectId: str}
     )
+
+# User Interests Models
+class UserInterestsCreate(BaseModel):
+    interests: List[str] = Field(..., min_items=1, max_items=20)
+
+class UserInterestsUpdate(BaseModel):
+    interests: List[str] = Field(..., min_items=1, max_items=20)
+
+class UserInterestsResponse(BaseModel):
+    id: PyObjectId = Field(alias="_id")
+    user_id: PyObjectId
+    interests: List[str]
+    created_at: datetime
+    updated_at: datetime
+    
+    model_config = ConfigDict(
+        populate_by_name=True,
+        arbitrary_types_allowed=True,
+        json_encoders={ObjectId: str}
+    )
+
+# UserInterestsInDB removed - unnecessary duplication
+
+# Blog Recommendation Models
+class BlogRecommendationResponse(BaseModel):
+    blog: BlogResponse
+    relevance_score: float
+
+class PaginatedBlogsResponse(BaseModel):
+    blogs: List[BlogRecommendationResponse]
+    total_count: int
+    page: int
+    page_size: int
+    total_pages: int
 
 # Token Models
 class Token(BaseModel):

@@ -24,7 +24,7 @@ async def create_tag(tag: TagCreate, current_user: UserInDB = Depends(get_curren
     }
     
     result = await db.tags.insert_one(tag_dict)
-    tag_dict["_id"] = result.inserted_id
+    tag_dict["_id"] = str(result.inserted_id)
     
     return TagResponse(**tag_dict)
 
@@ -37,6 +37,10 @@ async def get_all_tags(
     
     cursor = db.tags.find({}).skip(skip).limit(limit).sort("name", 1)
     tags = await cursor.to_list(length=limit)
+    
+    # Convert ObjectId to string for each tag
+    for tag in tags:
+        tag["_id"] = str(tag["_id"])
     
     return [TagResponse(**tag) for tag in tags]
 
@@ -53,6 +57,10 @@ async def search_tags(
     
     cursor = db.tags.find(search_filter).skip(skip).limit(limit).sort("name", 1)
     tags = await cursor.to_list(length=limit)
+    
+    # Convert ObjectId to string for each tag
+    for tag in tags:
+        tag["_id"] = str(tag["_id"])
     
     return [TagResponse(**tag) for tag in tags]
 
@@ -72,6 +80,9 @@ async def get_tag(tag_id: str):
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Tag not found"
         )
+    
+    # Convert ObjectId to string
+    tag["_id"] = str(tag["_id"])
     
     return TagResponse(**tag)
 
@@ -126,7 +137,7 @@ async def get_popular_tags(limit: int = Query(10, ge=1, le=50)):
         {"$unwind": "$tag_info"},
         {
             "$project": {
-                "_id": "$tag_info._id",
+                "_id": {"$toString": "$tag_info._id"},
                 "name": "$tag_info.name",
                 "usage_count": "$count"
             }

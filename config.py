@@ -6,6 +6,7 @@ class Settings:
     ALGORITHM: str = config("ALGORITHM", default="HS256")
     ACCESS_TOKEN_EXPIRE_MINUTES: int = config("ACCESS_TOKEN_EXPIRE_MINUTES", default=30, cast=int)
     REFRESH_TOKEN_EXPIRE_DAYS: int = config("REFRESH_TOKEN_EXPIRE_DAYS", default=7, cast=int)
+    ENVIRONMENT: str = config("ENVIRONMENT", default="development")
 
 settings = Settings()
 
