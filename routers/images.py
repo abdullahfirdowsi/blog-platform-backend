@@ -22,12 +22,19 @@ async def add_images_to_blog(
             detail="Invalid blog ID"
         )
     
-    # Check if blog exists and belongs to current user
-    blog = await db.blogs.find_one({"_id": ObjectId(blog_id), "user_id": current_user.id})
+    # First check if blog exists
+    blog = await db.blogs.find_one({"_id": ObjectId(blog_id)})
     if not blog:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="Blog not found or you don't have permission to add images"
+            detail="Blog not found"
+        )
+    
+    # Then check if user owns the blog
+    if str(blog["user_id"]) != current_user.id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="You don't have permission to add images to this blog"
         )
     
     # Check if images already exist for this blog
@@ -92,12 +99,19 @@ async def update_blog_images(
             detail="Invalid blog ID"
         )
     
-    # Check if blog exists and belongs to current user
-    blog = await db.blogs.find_one({"_id": ObjectId(blog_id), "user_id": current_user.id})
+    # First check if blog exists
+    blog = await db.blogs.find_one({"_id": ObjectId(blog_id)})
     if not blog:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="Blog not found or you don't have permission to update images"
+            detail="Blog not found"
+        )
+    
+    # Then check if user owns the blog
+    if str(blog["user_id"]) != current_user.id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="You don't have permission to update images for this blog"
         )
     
     # Check if images exist for this blog
@@ -135,12 +149,19 @@ async def delete_blog_images(
             detail="Invalid blog ID"
         )
     
-    # Check if blog exists and belongs to current user
-    blog = await db.blogs.find_one({"_id": ObjectId(blog_id), "user_id": current_user.id})
+    # First check if blog exists
+    blog = await db.blogs.find_one({"_id": ObjectId(blog_id)})
     if not blog:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="Blog not found or you don't have permission to delete images"
+            detail="Blog not found"
+        )
+    
+    # Then check if user owns the blog
+    if str(blog["user_id"]) != current_user.id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="You don't have permission to delete images for this blog"
         )
     
     result = await db.images.delete_one({"blog_id": ObjectId(blog_id)})
@@ -163,7 +184,7 @@ async def get_my_images(
     db = await get_database()
     
     # First get all blog IDs belonging to the current user
-    user_blogs = await db.blogs.find({"user_id": current_user.id}, {"_id": 1}).to_list(length=None)
+    user_blogs = await db.blogs.find({"user_id": ObjectId(current_user.id)}, {"_id": 1}).to_list(length=None)
     blog_ids = [blog["_id"] for blog in user_blogs]
     
     if not blog_ids:

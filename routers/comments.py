@@ -32,13 +32,15 @@ async def create_comment(
     
     comment_dict = {
         "blog_id": ObjectId(blog_id),
-        "user_id": current_user.id,
+        "user_id": ObjectId(current_user.id),
         "text": comment.text,
         "created_at": datetime.utcnow()
     }
     
     result = await db.comments.insert_one(comment_dict)
-    comment_dict["_id"] = result.inserted_id
+    comment_dict["_id"] = str(result.inserted_id)
+    comment_dict["blog_id"] = str(comment_dict["blog_id"])
+    comment_dict["user_id"] = str(comment_dict["user_id"])
     
     return CommentResponse(**comment_dict)
 
@@ -59,6 +61,12 @@ async def get_blog_comments(
     cursor = db.comments.find({"blog_id": ObjectId(blog_id)}).skip(skip).limit(limit).sort("created_at", -1)
     comments = await cursor.to_list(length=limit)
     
+    # Convert ObjectIds to strings for each comment
+    for comment in comments:
+        comment["_id"] = str(comment["_id"])
+        comment["blog_id"] = str(comment["blog_id"])
+        comment["user_id"] = str(comment["user_id"])
+    
     return [CommentResponse(**comment) for comment in comments]
 
 @router.get("/my-comments", response_model=List[CommentResponse])
@@ -69,8 +77,14 @@ async def get_my_comments(
 ):
     db = await get_database()
     
-    cursor = db.comments.find({"user_id": current_user.id}).skip(skip).limit(limit).sort("created_at", -1)
+    cursor = db.comments.find({"user_id": ObjectId(current_user.id)}).skip(skip).limit(limit).sort("created_at", -1)
     comments = await cursor.to_list(length=limit)
+    
+    # Convert ObjectIds to strings for each comment
+    for comment in comments:
+        comment["_id"] = str(comment["_id"])
+        comment["blog_id"] = str(comment["blog_id"])
+        comment["user_id"] = str(comment["user_id"])
     
     return [CommentResponse(**comment) for comment in comments]
 
@@ -84,12 +98,19 @@ async def delete_comment(comment_id: str, current_user: UserInDB = Depends(get_c
             detail="Invalid comment ID"
         )
     
-    # Check if comment exists and belongs to current user
-    comment = await db.comments.find_one({"_id": ObjectId(comment_id), "user_id": current_user.id})
+    # First check if comment exists
+    comment = await db.comments.find_one({"_id": ObjectId(comment_id)})
     if not comment:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="Comment not found or you don't have permission to delete it"
+            detail="Comment not found"
+        )
+    
+    # Then check if user owns the comment
+    if str(comment["user_id"]) != current_user.id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="You don't have permission to delete this comment"
         )
     
     await db.comments.delete_one({"_id": ObjectId(comment_id)})

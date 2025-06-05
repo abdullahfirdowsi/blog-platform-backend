@@ -9,4 +9,7 @@ python-multipart
 python-decouple
 bcrypt
 email-validator
+scikit-learn
+numpy
+nltk
 
