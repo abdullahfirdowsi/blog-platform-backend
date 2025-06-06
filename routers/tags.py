@@ -24,7 +24,7 @@ async def create_tag(tag: TagCreate, current_user: UserInDB = Depends(get_curren
     }
     
     result = await db.tags.insert_one(tag_dict)
-    tag_dict["_id"] = str(result.inserted_id)
+    tag_dict["id"] = str(result.inserted_id)
     
     return TagResponse(**tag_dict)
 
@@ -38,9 +38,10 @@ async def get_all_tags(
     cursor = db.tags.find({}).skip(skip).limit(limit).sort("name", 1)
     tags = await cursor.to_list(length=limit)
     
-    # Convert ObjectId to string for each tag
+    # Convert ObjectId to string and rename _id to id for each tag
     for tag in tags:
-        tag["_id"] = str(tag["_id"])
+        tag["id"] = str(tag["_id"])
+        del tag["_id"]
     
     return [TagResponse(**tag) for tag in tags]
 
@@ -58,9 +59,10 @@ async def search_tags(
     cursor = db.tags.find(search_filter).skip(skip).limit(limit).sort("name", 1)
     tags = await cursor.to_list(length=limit)
     
-    # Convert ObjectId to string for each tag
+    # Convert ObjectId to string and rename _id to id for each tag
     for tag in tags:
-        tag["_id"] = str(tag["_id"])
+        tag["id"] = str(tag["_id"])
+        del tag["_id"]
     
     return [TagResponse(**tag) for tag in tags]
 
@@ -81,8 +83,9 @@ async def get_tag(tag_id: str):
             detail="Tag not found"
         )
     
-    # Convert ObjectId to string
-    tag["_id"] = str(tag["_id"])
+    # Convert ObjectId to string and rename _id to id
+    tag["id"] = str(tag["_id"])
+    del tag["_id"]
     
     return TagResponse(**tag)
 

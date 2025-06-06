@@ -59,23 +59,23 @@ class UserInDB(BaseModel):
 # Blog Models
 class BlogCreate(BaseModel):
     title: str = Field(..., min_length=1, max_length=200)
-    content: str = Field(..., min_length=1)
+    content: Optional[str] = Field(None, description="Block-based content as JSON string")
     tag_ids: Optional[List[PyObjectId]] = []
     main_image_url: Optional[str] = None
     published: bool = False
 
 class BlogUpdate(BaseModel):
     title: Optional[str] = Field(None, min_length=1, max_length=200)
-    content: Optional[str] = Field(None, min_length=1)
+    content: Optional[str] = Field(None, min_length=1, description="Block-based content as JSON string")
     tag_ids: Optional[List[PyObjectId]] = None
     main_image_url: Optional[str] = None
     published: Optional[bool] = None
 
 class BlogResponse(BaseModel):
-    id: PyObjectId = Field(alias="_id")
+    id: PyObjectId
     user_id: PyObjectId
     title: str
-    content: str
+    blog_body: str = Field(description="Block-based content as JSON string")
     tag_ids: List[PyObjectId] = []
     main_image_url: Optional[str] = None
     published: bool
@@ -93,7 +93,7 @@ class BlogInDB(BaseModel):
     id: PyObjectId = Field(alias="_id")
     user_id: PyObjectId
     title: str
-    content: str
+    blog_body: str = Field(description="Block-based content as JSON string")
     tag_ids: List[PyObjectId] = []
     main_image_url: Optional[str] = None
     published: bool
@@ -144,7 +144,7 @@ class TagCreate(BaseModel):
     name: str = Field(..., min_length=1, max_length=50)
 
 class TagResponse(BaseModel):
-    id: PyObjectId = Field(alias="_id")
+    id: PyObjectId
     name: str
     
     model_config = ConfigDict(

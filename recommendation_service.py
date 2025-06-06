@@ -150,7 +150,7 @@ class BlogRecommendationService:
                 # Calculate content similarity based on user interests
                 content_score = self.calculate_content_similarity(
                     user_interests,
-                    blog.get('content', ''),
+                    blog.get('blog_body', ''),
                     blog.get('title', ''),
                     blog_tag_names
                 )
@@ -169,7 +169,7 @@ class BlogRecommendationService:
                 "_id": str(blog["_id"]),
                 "user_id": str(blog["user_id"]),
                 "title": blog.get("title", ""),
-                "content": blog.get("content", ""),
+                "blog_body": blog.get("blog_body", ""),
                 "tag_ids": [str(tag_id) for tag_id in blog.get("tag_ids", [])],
                 "main_image_url": blog.get("main_image_url"),
                 "published": blog.get("published", False),

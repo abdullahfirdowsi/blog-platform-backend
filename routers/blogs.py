@@ -1,4 +1,4 @@
-from fastapi import APIRouter, HTTPException, status, Depends, Query
+from fastapi import APIRouter, HTTPException, status, Depends, Query, Request
 from typing import List, Optional
 from datetime import datetime
 from models import (
@@ -12,8 +12,26 @@ from recommendation_service import recommendation_service
 
 router = APIRouter(prefix="/blogs", tags=["blogs"])
 
+@router.post("/debug", status_code=200)
+async def debug_blog_data(request: Request):
+    body = await request.body()
+    headers = dict(request.headers)
+    print(f"DEBUG RAW BODY: {body}")
+    print(f"DEBUG HEADERS: {headers}")
+    try:
+        import json
+        parsed_body = json.loads(body)
+        print(f"DEBUG PARSED BODY: {parsed_body}")
+        return {"message": "Debug successful", "body": parsed_body}
+    except Exception as e:
+        print(f"DEBUG ERROR: {e}")
+        return {"message": "Debug error", "error": str(e)}
+
 @router.post("/", response_model=BlogResponse)
 async def create_blog(blog: BlogCreate, current_user: UserInDB = Depends(get_current_user)):
+    print(f"DEBUG: Received blog data: {blog}")
+    print(f"DEBUG: Blog content: {blog.content}")
+    print(f"DEBUG: Blog tag_ids: {blog.tag_ids}")
     db = await get_database()
     
     # Convert tag_ids to ObjectIds
@@ -24,7 +42,7 @@ async def create_blog(blog: BlogCreate, current_user: UserInDB = Depends(get_cur
     blog_dict = {
         "user_id": ObjectId(current_user.id),
         "title": blog.title,
-        "content": blog.content,
+        "blog_body": blog.content or "",  # Map frontend 'content' to backend 'blog_body', default to empty string
         "tag_ids": tag_ids,
         "main_image_url": blog.main_image_url,
         "published": blog.published,
@@ -35,7 +53,7 @@ async def create_blog(blog: BlogCreate, current_user: UserInDB = Depends(get_cur
     result = await db.blogs.insert_one(blog_dict)
     
     # Convert ObjectIds to strings for the response
-    blog_dict["_id"] = str(result.inserted_id)
+    blog_dict["id"] = str(result.inserted_id)
     blog_dict["user_id"] = str(blog_dict["user_id"])
     blog_dict["tag_ids"] = [str(tag_id) for tag_id in blog_dict["tag_ids"]]
     
@@ -117,10 +135,10 @@ async def get_my_blogs(
         
         # Create response with converted IDs
         blog_response_data = {
-            "_id": blog_id_str,
+            "id": blog_id_str,
             "user_id": user_id_str,
             "title": blog.get("title", ""),
-            "content": blog.get("content", ""),
+            "blog_body": blog.get("blog_body", ""),
             "tag_ids": tag_ids_str,
             "main_image_url": blog.get("main_image_url"),
             "published": blog.get("published", False),
@@ -152,7 +170,8 @@ async def get_blog(blog_id: str):
         )
     
     # Convert ObjectIds to strings for the response
-    blog["_id"] = str(blog["_id"])
+    blog["id"] = str(blog["_id"])
+    del blog["_id"]
     blog["user_id"] = str(blog["user_id"])
     blog["tag_ids"] = [str(tag_id) for tag_id in blog.get("tag_ids", [])]
     
@@ -192,7 +211,7 @@ async def update_blog(
     if blog_update.title is not None:
         update_data["title"] = blog_update.title
     if blog_update.content is not None:
-        update_data["content"] = blog_update.content
+        update_data["blog_body"] = blog_update.content
     if blog_update.tag_ids is not None:
         # Convert tag_ids to ObjectIds
         tag_ids = [ObjectId(tag_id) for tag_id in blog_update.tag_ids if ObjectId.is_valid(tag_id)]
@@ -210,7 +229,8 @@ async def update_blog(
     updated_blog = await db.blogs.find_one({"_id": ObjectId(blog_id)})
     
     # Convert ObjectIds to strings for the response
-    updated_blog["_id"] = str(updated_blog["_id"])
+    updated_blog["id"] = str(updated_blog["_id"])
+    del updated_blog["_id"]
     updated_blog["user_id"] = str(updated_blog["user_id"])
     updated_blog["tag_ids"] = [str(tag_id) for tag_id in updated_blog.get("tag_ids", [])]
     
@@ -274,14 +294,14 @@ async def search_blogs(
     """Search blogs and sort by relevance to user interests"""
     db = await get_database()
     
-    # Search in title and content
+    # Search in title and blog_body
     search_filter = {
         "$and": [
             {"published": True},
             {
                 "$or": [
                     {"title": {"$regex": query, "$options": "i"}},
-                    {"content": {"$regex": query, "$options": "i"}}
+                    {"blog_body": {"$regex": query, "$options": "i"}}
                 ]
             }
         ]
@@ -317,7 +337,7 @@ async def search_blogs(
             # Calculate similarity score
             content_score = recommendation_service.calculate_content_similarity(
                 user_interests,
-                blog.get('content', ''),
+                blog.get('blog_body', ''),
                 blog.get('title', ''),
                 blog_tag_names
             )
@@ -329,10 +349,10 @@ async def search_blogs(
         
         # Convert ObjectIds to strings for response
         blog_response_data = {
-            "_id": str(blog["_id"]),
+            "id": str(blog["_id"]),
             "user_id": str(blog["user_id"]),
             "title": blog.get("title", ""),
-            "content": blog.get("content", ""),
+            "blog_body": blog.get("blog_body", ""),
             "tag_ids": [str(tag_id) for tag_id in blog.get("tag_ids", [])],
             "main_image_url": blog.get("main_image_url"),
             "published": blog.get("published", False),
