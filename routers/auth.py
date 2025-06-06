@@ -442,6 +442,12 @@ async def google_login(google_request: GoogleAuthRequest, response: Response):
         name = id_info.get('name', '')
         picture = id_info.get('picture', '')
         
+        # Debug logging to see what Google returns
+        print(f"DEBUG: Google ID token info: {id_info}")
+        print(f"DEBUG: Extracted name: '{name}'")
+        print(f"DEBUG: Extracted email: '{email}'")
+        print(f"DEBUG: Extracted picture: '{picture}'")
+        
         db = await get_database()
         
         # Check if user exists
