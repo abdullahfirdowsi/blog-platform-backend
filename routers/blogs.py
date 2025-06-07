@@ -53,7 +53,7 @@ async def create_blog(blog: BlogCreate, current_user: UserInDB = Depends(get_cur
     result = await db.blogs.insert_one(blog_dict)
     
     # Convert ObjectIds to strings for the response
-    blog_dict["id"] = str(result.inserted_id)
+    blog_dict["_id"] = str(result.inserted_id)
     blog_dict["user_id"] = str(blog_dict["user_id"])
     blog_dict["tag_ids"] = [str(tag_id) for tag_id in blog_dict["tag_ids"]]
     

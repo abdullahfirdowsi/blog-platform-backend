@@ -72,7 +72,7 @@ class BlogUpdate(BaseModel):
     published: Optional[bool] = None
 
 class BlogResponse(BaseModel):
-    id: PyObjectId
+    id: PyObjectId = Field(alias="_id")
     user_id: PyObjectId
     title: str
     blog_body: str = Field(description="Block-based content as JSON string")
