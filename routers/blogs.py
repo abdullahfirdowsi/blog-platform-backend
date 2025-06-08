@@ -169,11 +169,13 @@ async def get_blog(blog_id: str):
             detail="Blog not found"
         )
     
-    # Convert ObjectIds to strings for the response
-    blog["id"] = str(blog["_id"])
-    del blog["_id"]
+    # Convert ObjectIds to strings and map fields correctly
+    blog["_id"] = str(blog["_id"])
     blog["user_id"] = str(blog["user_id"])
     blog["tag_ids"] = [str(tag_id) for tag_id in blog.get("tag_ids", [])]
+    
+    # Set empty tags list for response
+    blog["tags"] = []
     
     return BlogResponse(**blog)
 

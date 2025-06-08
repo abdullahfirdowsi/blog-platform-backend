@@ -31,36 +31,36 @@ async def connect_to_mongo():
             db.client = AsyncIOMotorClient(settings.MONGODB_URL, **connection_options)
             db.database = db.client.get_database("blogging")
             await db.client.server_info()
-            print("✅ Connected to MongoDB successfully")
+            print("Connected to MongoDB successfully")
             return
         except Exception as connection_error:
             error_msg = str(connection_error)
             
             # Provide specific guidance based on error type
             if "TLSV1_ALERT_INTERNAL_ERROR" in error_msg:
-                print("❌ MongoDB SSL/TLS Error - This usually indicates:")
+                print("MongoDB SSL/TLS Error - This usually indicates:")
                 print("   1. Your IP address is not whitelisted in MongoDB Atlas Network Access")
                 print("   2. The MongoDB cluster has SSL/TLS configuration issues")
                 print("   3. Corporate firewall is blocking the SSL handshake")
-                print("\n🔧 To fix this:")
+                print("\nTo fix this:")
                 print("   • Go to MongoDB Atlas Dashboard → Network Access → Add IP Address")
                 print("   • Add your current IP or use 0.0.0.0/0 for development (not recommended for production)")
                 print("   • Wait 2-3 minutes for changes to propagate")
             elif "connection closed" in error_msg:
-                print("❌ MongoDB Connection Closed - Your IP is likely not whitelisted")
-                print("\n🔧 Fix: Add your IP to MongoDB Atlas Network Access whitelist")
+                print("MongoDB Connection Closed - Your IP is likely not whitelisted")
+                print("\nFix: Add your IP to MongoDB Atlas Network Access whitelist")
             elif "authentication failed" in error_msg.lower():
-                print("❌ MongoDB Authentication Failed - Check your credentials")
+                print("MongoDB Authentication Failed - Check your credentials")
             else:
-                print(f"❌ MongoDB Connection Failed: {error_msg[:200]}...")
+                print(f"MongoDB Connection Failed: {error_msg[:200]}...")
             
-            print(f"\n📋 Connection URL being used: {settings.MONGODB_URL[:50]}...")
+            print(f"\nConnection URL being used: {settings.MONGODB_URL[:50]}...")
         
     except Exception as e:
-        print(f"❌ MongoDB initialization error: {e}")
+        print(f"MongoDB initialization error: {e}")
         
     # Set up a dummy database object so the app can still start
-    print("⚠️  Starting application without MongoDB connection")
+    print("Starting application without MongoDB connection")
     print("   Some features requiring database access will not work")
     db.client = None
     db.database = None

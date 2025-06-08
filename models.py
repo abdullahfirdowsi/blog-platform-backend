@@ -25,10 +25,10 @@ class UserResponse(BaseModel):
     bio: Optional[str] = None
     profile_picture: Optional[str] = None
     google_id: Optional[str] = None
-    created_at: datetime
-    has_password: bool = False  # Indicates if user can change password
     is_active: bool = True
     role: str = "user"
+    created_at: datetime
+    has_password: bool = False
     
     model_config = ConfigDict(
         populate_by_name=True,
@@ -47,6 +47,7 @@ class UserInDB(BaseModel):
     profile_picture: Optional[str] = None
     google_id: Optional[str] = None
     created_at: datetime
+    has_password: bool = False  # Indicates if user can change password
     is_active: bool = True
     role: str = "user"
     
@@ -75,7 +76,7 @@ class BlogResponse(BaseModel):
     id: PyObjectId = Field(alias="_id")
     user_id: PyObjectId
     title: str
-    blog_body: str = Field(description="Block-based content as JSON string")
+    content: str = Field(alias="blog_body", description="Block-based content as JSON string")
     tag_ids: List[PyObjectId] = []
     main_image_url: Optional[str] = None
     published: bool
@@ -224,4 +225,34 @@ class ProfileUpdateRequest(BaseModel):
     full_name: Optional[str] = None
     bio: Optional[str] = None
     profile_picture: Optional[str] = None
+
+
+# Blog Summary Models
+class BlogSummaryCreate(BaseModel):
+    blog_id: PyObjectId
+    summary: str = Field(..., min_length=1, max_length=1000)
+
+class BlogSummaryResponse(BaseModel):
+    id: PyObjectId = Field(alias="_id")
+    blog_id: PyObjectId
+    summary: str
+    created_at: datetime
+    
+    model_config = ConfigDict(
+        populate_by_name=True,
+        arbitrary_types_allowed=True,
+        json_encoders={ObjectId: str}
+    )
+
+class BlogSummaryInDB(BaseModel):
+    id: PyObjectId = Field(alias="_id")
+    blog_id: PyObjectId
+    summary: str
+    created_at: datetime
+    
+    model_config = ConfigDict(
+        populate_by_name=True,
+        arbitrary_types_allowed=True,
+        json_encoders={ObjectId: str}
+    )
 

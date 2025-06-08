@@ -134,6 +134,9 @@ async def login(user_credentials: UserLogin, response: Response):
     user_data.setdefault("bio", None)
     user_data.setdefault("is_active", True)
     user_data.setdefault("role", "user")
+    # Map id to _id for proper field mapping
+    if "id" in user_data:
+        user_data["_id"] = user_data.pop("id")
     user_response = UserResponse(**user_data)
     
     return LoginResponse(
@@ -201,6 +204,9 @@ async def refresh_token(request: Request, response: Response):
         user_data.setdefault("bio", None)
         user_data.setdefault("is_active", True)
         user_data.setdefault("role", "user")
+        # Map id to _id for proper field mapping
+        if "id" in user_data:
+            user_data["_id"] = user_data.pop("id")
         user_response = UserResponse(**user_data)
         
         return RefreshResponse(
@@ -248,6 +254,9 @@ async def read_users_me(current_user: UserInDB = Depends(get_current_user)):
     user_data.setdefault("bio", None)
     user_data.setdefault("is_active", True)
     user_data.setdefault("role", "user")
+    # Map id to _id for proper field mapping
+    if "id" in user_data:
+        user_data["_id"] = user_data.pop("id")
     return UserResponse(**user_data)
 
 @router.post("/change-password")
@@ -349,6 +358,9 @@ async def update_profile(
         user_data.setdefault("bio", None)
         user_data.setdefault("is_active", True)
         user_data.setdefault("role", "user")
+        # Map id to _id for proper field mapping
+        if "id" in user_data:
+            user_data["_id"] = user_data.pop("id")
         return UserResponse(**user_data)
     
     # Update user in database
@@ -379,6 +391,9 @@ async def update_profile(
     user_data.setdefault("bio", None)
     user_data.setdefault("is_active", True)
     user_data.setdefault("role", "user")
+    # Map id to _id for proper field mapping
+    if "id" in user_data:
+        user_data["_id"] = user_data.pop("id")
     return UserResponse(**user_data)
 
 # Google OAuth2 Models

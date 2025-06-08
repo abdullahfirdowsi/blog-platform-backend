@@ -2,7 +2,7 @@ from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
 from database import connect_to_mongo, close_mongo_connection
-from routers import auth, blogs, comments, likes, tags, images, interests
+from routers import auth, blogs, comments, likes, tags, images, interests, blog_summaries
 
 from routers.auth import router as auth_router
 from routers.blogs import router as blogs_router
@@ -11,6 +11,7 @@ from routers.likes import router as likes_router
 from routers.tags import router as tags_router
 from routers.images import router as images_router
 from routers.interests import router as interests_router
+from routers.blog_summaries import router as blog_summaries_router
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -74,6 +75,7 @@ app.include_router(likes_router, prefix="/api/v1")
 app.include_router(tags_router, prefix="/api/v1")
 app.include_router(images_router, prefix="/api/v1")
 app.include_router(interests_router, prefix="/api/v1")
+app.include_router(blog_summaries_router, prefix="/api/v1/blog-summaries")
 
 @app.get("/")
 async def root():
