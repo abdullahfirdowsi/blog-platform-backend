@@ -18,7 +18,7 @@ router = APIRouter(prefix="/images", tags=["Images"])
 AWS_ACCESS_KEY = config("AWS_ACCESS_KEY_ID")
 AWS_SECRET_KEY = config("AWS_SECRET_ACCESS_KEY")
 AWS_REGION = config("AWS_REGION", default="eu-north-1")
-BUCKET_NAME = config("S3_BUCKET_NAME", default="blog-app-2025")
+BUCKET_NAME = config("BUCKET_NAME", default="blog-app-2025")
 MAX_FILE_SIZE = 5 * 1024 * 1024  # 5MB
 
 # S3 Client

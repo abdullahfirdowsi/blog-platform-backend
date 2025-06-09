@@ -13,3 +13,4 @@ scikit-learn
 numpy
 nltk
 boto3
+decouple
