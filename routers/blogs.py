@@ -1,8 +1,9 @@
+import re
 from fastapi import APIRouter, HTTPException, status, Depends, Query
 from typing import List, Optional
-from datetime import datetime
+from datetime import datetime, timezone
 from models import (
-    BlogCreate, BlogUpdate, BlogResponse, BlogInDB, UserInDB,
+    BlogCreate, BlogUpdate, BlogResponse, UserInDB,
     PaginatedBlogsResponse, BlogRecommendationResponse
 )
 from auth import get_current_user, get_current_user_optional
@@ -16,20 +17,43 @@ router = APIRouter(prefix="/blogs", tags=["blogs"])
 async def create_blog(blog: BlogCreate, current_user: UserInDB = Depends(get_current_user)):
     db = await get_database()
     
-    # Convert tag_ids to ObjectIds
-    tag_ids = []
-    if blog.tag_ids:
-        tag_ids = [ObjectId(tag_id) for tag_id in blog.tag_ids if ObjectId.is_valid(tag_id)]
-    
+    # Process tags (remove empty/whitespace tags)
+    if blog.tags:
+        blog.tags = [tag.strip().lower() for tag in blog.tags if tag.strip()]
+        
+        # Check/create tags in the tags collection
+        if blog.tags:
+            # Build case-insensitive query for existing tags
+            existing_tags = await db.tags.find({
+                "$or": [
+                    {"name": {"$regex": f"^{re.escape(tag)}$", "$options": "i"}} 
+                    for tag in blog.tags
+                ]
+            }).to_list(None)
+            
+            existing_tag_names = {tag["name"].lower() for tag in existing_tags}
+            
+            # Insert new tags
+            tags_to_insert = [
+                {"name": tag, "created_at": datetime.now(timezone.utc)}
+                for tag in blog.tags 
+                if tag.lower() not in existing_tag_names
+            ]
+            
+            if tags_to_insert:
+                await db.tags.insert_many(tags_to_insert)
+        
     blog_dict = {
         "user_id": ObjectId(current_user.id),
         "title": blog.title,
         "content": blog.content,
-        "tag_ids": tag_ids,
+        "tags": blog.tags,
         "main_image_url": blog.main_image_url,
         "published": blog.published,
-        "created_at": datetime.utcnow(),
-        "updated_at": datetime.utcnow()
+        "created_at": datetime.now(timezone.utc),
+        "updated_at": datetime.now(timezone.utc),
+        "comment_count": 0,
+        "likes_count": 0
     }
     
     result = await db.blogs.insert_one(blog_dict)
@@ -37,7 +61,6 @@ async def create_blog(blog: BlogCreate, current_user: UserInDB = Depends(get_cur
     # Convert ObjectIds to strings for the response
     blog_dict["_id"] = str(result.inserted_id)
     blog_dict["user_id"] = str(blog_dict["user_id"])
-    blog_dict["tag_ids"] = [str(tag_id) for tag_id in blog_dict["tag_ids"]]
     
     return BlogResponse(**blog_dict)
 
@@ -46,7 +69,7 @@ async def get_blogs(
     page: int = Query(1, ge=1),
     page_size: int = Query(10, ge=1, le=100),
     published_only: bool = Query(True),
-    tag_id: Optional[str] = Query(None),
+    tags: Optional[str] = Query(None),
     current_user: Optional[UserInDB] = Depends(get_current_user_optional)
 ):
     """Get all blogs sorted by user interest relevance (if user is authenticated)"""
@@ -58,6 +81,7 @@ async def get_blogs(
         user_interests_doc = await db.user_interests.find_one({"user_id": ObjectId(current_user.id)})
         if user_interests_doc:
             user_interests = user_interests_doc.get('interests', [])
+            print(f"user_interest = {user_interests}")
     
     # Get blogs sorted by interest relevance
     recommendations, total_count = await recommendation_service.get_all_blogs_sorted_by_interest(
@@ -65,7 +89,7 @@ async def get_blogs(
         page=page,
         page_size=page_size,
         published_only=published_only,
-        tag_id=tag_id
+        tags=tags
     )
     
     # Calculate total pages
@@ -87,46 +111,28 @@ async def get_my_blogs(
 ):
     db = await get_database()
     
-    # Calculate skip value from page
-    skip = (page - 1) * page_size
-    
-    cursor = db.blogs.find({"user_id": ObjectId(current_user.id)}).skip(skip).limit(page_size).sort("created_at", -1)
+    # Calculate skip value from page    
+    cursor = db.blogs.find({"user_id": ObjectId(current_user.id)}) \
+         .sort("created_at", -1) \
+         .skip((page - 1) * page_size) \
+         .limit(page_size)
     blogs = await cursor.to_list(length=page_size)
-    
-    # Get tag names for blogs
-    tag_ids = set()
-    for blog in blogs:
-        tag_ids.update(blog.get('tag_ids', []))
-    
-    tag_names_map = {}
-    if tag_ids:
-        tags_cursor = db.tags.find({"_id": {"$in": list(tag_ids)}})
-        tags = await tags_cursor.to_list(length=None)
-        tag_names_map = {tag['_id']: tag['name'] for tag in tags}
     
     # Add tag names to blog responses
     blog_responses = []
     for blog in blogs:
-        # Convert ObjectIds to strings
-        blog_id_str = str(blog["_id"])
-        user_id_str = str(blog["user_id"])
-        tag_ids_str = [str(tag_id) for tag_id in blog.get("tag_ids", [])]
-        
-        # Get tag names using original ObjectIds
-        blog_tag_names = [tag_names_map.get(tag_id, '') for tag_id in blog.get('tag_ids', [])]
-        
-        # Create response with converted IDs
         blog_response_data = {
-            "_id": blog_id_str,
-            "user_id": user_id_str,
+            "_id": str(blog["_id"]),
+            "user_id": str(blog["user_id"]),
             "title": blog.get("title", ""),
             "content": blog.get("content", ""),
-            "tag_ids": tag_ids_str,
+            "tags": blog.get("tags", []),
             "main_image_url": blog.get("main_image_url"),
             "published": blog.get("published", False),
             "created_at": blog.get("created_at"),
             "updated_at": blog.get("updated_at"),
-            "tags": blog_tag_names
+            "comment_count":blog.get("comment_count"),
+            "likes_count":blog.get("likes_count")
         }
         
         blog_response = BlogResponse(**blog_response_data)
@@ -154,7 +160,6 @@ async def get_blog(blog_id: str):
     # Convert ObjectIds to strings for the response
     blog["_id"] = str(blog["_id"])
     blog["user_id"] = str(blog["user_id"])
-    blog["tag_ids"] = [str(tag_id) for tag_id in blog.get("tag_ids", [])]
     
     return BlogResponse(**blog)
 
@@ -193,10 +198,8 @@ async def update_blog(
         update_data["title"] = blog_update.title
     if blog_update.content is not None:
         update_data["content"] = blog_update.content
-    if blog_update.tag_ids is not None:
-        # Convert tag_ids to ObjectIds
-        tag_ids = [ObjectId(tag_id) for tag_id in blog_update.tag_ids if ObjectId.is_valid(tag_id)]
-        update_data["tag_ids"] = tag_ids
+    if blog_update.tags is not None:
+        update_data["tags"] = blog_update.tags
     if blog_update.main_image_url is not None:
         update_data["main_image_url"] = blog_update.main_image_url
     if blog_update.published is not None:
@@ -212,20 +215,7 @@ async def update_blog(
     # Convert ObjectIds to strings for the response
     updated_blog["_id"] = str(updated_blog["_id"])
     updated_blog["user_id"] = str(updated_blog["user_id"])
-    updated_blog["tag_ids"] = [str(tag_id) for tag_id in updated_blog.get("tag_ids", [])]
-    
-    # Get tag names for the response
-    tag_ids = updated_blog.get("tag_ids", [])
-    tag_names = []
-    if tag_ids:
-        # Convert string IDs back to ObjectIds for database query
-        object_tag_ids = [ObjectId(tag_id) for tag_id in tag_ids if ObjectId.is_valid(tag_id)]
-        if object_tag_ids:
-            tags_cursor = db.tags.find({"_id": {"$in": object_tag_ids}})
-            tags = await tags_cursor.to_list(length=None)
-            tag_names = [tag['name'] for tag in tags]
-    
-    updated_blog["tags"] = tag_names
+    updated_blog["tags"] = updated_blog.get("tags", [])
     
     return BlogResponse(**updated_blog)
 
@@ -254,10 +244,9 @@ async def delete_blog(blog_id: str, current_user: UserInDB = Depends(get_current
             detail="You don't have permission to delete this blog"
         )
     
-    # Delete associated comments, likes, and images
+    # Delete associated comments, likes
     await db.comments.delete_many({"blog_id": ObjectId(blog_id)})
     await db.likes.delete_many({"blog_id": ObjectId(blog_id)})
-    await db.images.delete_many({"blog_id": ObjectId(blog_id)})
     
     # Delete the blog
     await db.blogs.delete_one({"_id": ObjectId(blog_id)})
@@ -281,13 +270,15 @@ async def search_blogs(
             {
                 "$or": [
                     {"title": {"$regex": query, "$options": "i"}},
-                    {"content": {"$regex": query, "$options": "i"}}
+                    {"content": {"$regex": query, "$options": "i"}},
+                    {"tags": {"$regex": query, "$options": "i"}}
                 ]
             }
         ]
     }
     
     cursor = db.blogs.find(search_filter)
+    print(f"search_filter = {search_filter}")
     all_matching_blogs = await cursor.to_list(length=None)
     
     # Get user interests if user is authenticated
@@ -297,21 +288,10 @@ async def search_blogs(
         if user_interests_doc:
             user_interests = user_interests_doc.get('interests', [])
     
-    # Get tag names for blogs
-    tag_ids = set()
-    for blog in all_matching_blogs:
-        tag_ids.update(blog.get('tag_ids', []))
-    
-    tag_names_map = {}
-    if tag_ids:
-        tags_cursor = db.tags.find({"_id": {"$in": list(tag_ids)}})
-        tags = await tags_cursor.to_list(length=None)
-        tag_names_map = {tag['_id']: tag['name'] for tag in tags}
-    
     # Calculate relevance scores and sort
     recommendations = []
     for blog in all_matching_blogs:
-        blog_tag_names = [tag_names_map.get(tag_id, '') for tag_id in blog.get('tag_ids', [])]
+        blog_tag_names = blog.get('tags', [])
         
         if user_interests:
             # Calculate similarity score
@@ -327,18 +307,19 @@ async def search_blogs(
             # Sort by engagement only
             total_score = recommendation_service.calculate_engagement_score(blog)
         
-        # Convert ObjectIds to strings for response
         blog_response_data = {
             "_id": str(blog["_id"]),
             "user_id": str(blog["user_id"]),
             "title": blog.get("title", ""),
             "content": blog.get("content", ""),
-            "tag_ids": [str(tag_id) for tag_id in blog.get("tag_ids", [])],
+            "tags": blog_tag_names,  # Directly use the tags
             "main_image_url": blog.get("main_image_url"),
             "published": blog.get("published", False),
             "created_at": blog.get("created_at"),
             "updated_at": blog.get("updated_at"),
-            "tags": blog_tag_names
+            "comment_count": blog.get("comment_count", 0),
+            "comment_count": blog.get("comment_count", 0),
+            "likes_count": blog.get("likes_count", 0)
         }
         
         blog_response = BlogResponse(**blog_response_data)

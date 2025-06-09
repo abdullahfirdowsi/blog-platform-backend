@@ -1,198 +1,141 @@
-from fastapi import APIRouter, HTTPException, status, Depends, Query
+import logging
+from uuid import uuid4
+from io import BytesIO
 from typing import List
-from datetime import datetime
-from models import ImageCreate, ImageResponse, UserInDB
-from auth import get_current_user
-from database import get_database
-from bson import ObjectId
 
-router = APIRouter(prefix="/images", tags=["images"])
+import boto3
+from botocore.exceptions import ClientError
+from fastapi import APIRouter, File, UploadFile, HTTPException, Depends
+from fastapi.responses import JSONResponse
+from decouple import config
 
-@router.post("/blogs/{blog_id}", response_model=ImageResponse)
-async def add_images_to_blog(
-    blog_id: str,
-    image_data: ImageCreate,
-    current_user: UserInDB = Depends(get_current_user)
+from models import SingleImageResponse, S3ImagesListResponse
+from auth import get_current_user 
+
+router = APIRouter(prefix="/images", tags=["Images"])
+
+# AWS Configuration
+AWS_ACCESS_KEY = config("AWS_ACCESS_KEY_ID")
+AWS_SECRET_KEY = config("AWS_SECRET_ACCESS_KEY")
+AWS_REGION = config("AWS_REGION", default="eu-north-1")
+BUCKET_NAME = config("S3_BUCKET_NAME", default="blog-app-2025")
+MAX_FILE_SIZE = 5 * 1024 * 1024  # 5MB
+
+# S3 Client
+s3_client = boto3.client(
+    "s3",
+    aws_access_key_id=AWS_ACCESS_KEY,
+    aws_secret_access_key=AWS_SECRET_KEY,
+    region_name=AWS_REGION
+)
+
+# Logger Setup
+logger = logging.getLogger(__name__)
+logging.basicConfig(level=logging.INFO)
+
+
+def generate_s3_url(key: str) -> str:
+    """Generate a public URL for a given S3 key."""
+    base = f"https://{BUCKET_NAME}.s3"
+    return f"{base}.{AWS_REGION}.amazonaws.com/{key}" if AWS_REGION != "us-east-1" else f"{base}.amazonaws.com/{key}"
+
+
+@router.post("/upload", response_model=SingleImageResponse)
+async def upload_image(
+    image: UploadFile = File(...),
+    current_user: dict = Depends(get_current_user)
 ):
-    db = await get_database()
-    
-    if not ObjectId.is_valid(blog_id):
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Invalid blog ID"
-        )
-    
-    # First check if blog exists
-    blog = await db.blogs.find_one({"_id": ObjectId(blog_id)})
-    if not blog:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Blog not found"
-        )
-    
-    # Then check if user owns the blog
-    if str(blog["user_id"]) != current_user.id:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="You don't have permission to add images to this blog"
-        )
-    
-    # Check if images already exist for this blog
-    existing_images = await db.images.find_one({"blog_id": ObjectId(blog_id)})
-    
-    if existing_images:
-        # Update existing images
-        await db.images.update_one(
-            {"blog_id": ObjectId(blog_id)},
-            {
-                "$set": {
-                    "image_url": image_data.image_url,
-                    "uploaded_at": datetime.utcnow()
+    """Upload a validated image to AWS S3."""
+    try:
+        if not image.content_type or not image.content_type.startswith("image/"):
+            raise HTTPException(status_code=400, detail="Only image files are allowed")
+
+        contents = await image.read()
+        if not contents:
+            raise HTTPException(status_code=400, detail="File is empty")
+        if len(contents) > MAX_FILE_SIZE:
+            raise HTTPException(status_code=413, detail="File exceeds 5MB limit")
+
+        file_ext = image.filename.split('.')[-1] if '.' in image.filename else 'jpg'
+        key = f"uploads/{uuid4().hex}.{file_ext}"
+
+        try:
+            s3_client.upload_fileobj(
+                Fileobj=BytesIO(contents),
+                Bucket=BUCKET_NAME,
+                Key=key,
+                ExtraArgs={
+                    "ContentType": image.content_type,
+                    "ACL": "public-read"
                 }
+            )
+        except ClientError as e:
+            if "AccessControlListNotSupported" in str(e):
+                s3_client.upload_fileobj(
+                    Fileobj=BytesIO(contents),
+                    Bucket=BUCKET_NAME,
+                    Key=key,
+                    ExtraArgs={"ContentType": image.content_type}
+                )
+            else:
+                logger.error(f"Upload failed: {e}")
+                raise HTTPException(status_code=500, detail="Upload to S3 failed")
+
+        s3_client.head_object(Bucket=BUCKET_NAME, Key=key)
+        return SingleImageResponse(
+            success=True,
+            message="Image uploaded successfully",
+            imageUrl=generate_s3_url(key)
+        )
+
+    except ClientError as ce:
+        logger.error(f"S3 ClientError: {ce}")
+        raise HTTPException(status_code=500, detail="S3 client error")
+    except Exception as e:
+        logger.exception("Unexpected upload error")
+        raise HTTPException(status_code=500, detail="Internal server error")
+
+
+@router.get("/list", response_model=S3ImagesListResponse)
+async def list_images(
+    prefix: str = "uploads/",
+    current_user: dict = Depends(get_current_user)
+):
+    """List uploaded images in the S3 bucket."""
+    try:
+        response = s3_client.list_objects_v2(Bucket=BUCKET_NAME, Prefix=prefix)
+        items = response.get("Contents", [])
+        images = [
+            {
+                "key": obj["Key"],
+                "url": generate_s3_url(obj["Key"]),
+                "size": obj["Size"],
+                "lastModified": obj["LastModified"].isoformat()
             }
-        )
-        updated_images = await db.images.find_one({"blog_id": ObjectId(blog_id)})
-        return ImageResponse(**updated_images)
-    else:
-        # Create new image record
-        image_dict = {
-            "blog_id": ObjectId(blog_id),
-            "image_url": image_data.image_url,
-            "uploaded_at": datetime.utcnow()
-        }
-        
-        result = await db.images.insert_one(image_dict)
-        image_dict["_id"] = result.inserted_id
-        
-        return ImageResponse(**image_dict)
+            for obj in items
+        ]
+        return S3ImagesListResponse(success=True, images=images)
+    except ClientError as e:
+        logger.error(f"S3 list error: {e}")
+        raise HTTPException(status_code=500, detail="Error listing images")
 
-@router.get("/blogs/{blog_id}", response_model=ImageResponse)
-async def get_blog_images(blog_id: str):
-    db = await get_database()
-    
-    if not ObjectId.is_valid(blog_id):
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Invalid blog ID"
-        )
-    
-    images = await db.images.find_one({"blog_id": ObjectId(blog_id)})
-    if not images:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="No images found for this blog"
-        )
-    
-    return ImageResponse(**images)
 
-@router.put("/blogs/{blog_id}", response_model=ImageResponse)
-async def update_blog_images(
-    blog_id: str,
-    image_data: ImageCreate,
-    current_user: UserInDB = Depends(get_current_user)
+@router.get("/{file_key:path}", response_model=SingleImageResponse)
+async def get_image_url(
+    file_key: str,
+    current_user: dict = Depends(get_current_user)
 ):
-    db = await get_database()
-    
-    if not ObjectId.is_valid(blog_id):
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Invalid blog ID"
+    """Get a presigned URL for the image."""
+    try:
+        s3_client.head_object(Bucket=BUCKET_NAME, Key=file_key)
+        url = s3_client.generate_presigned_url(
+            ClientMethod="get_object",
+            Params={"Bucket": BUCKET_NAME, "Key": file_key},
+            ExpiresIn=3600  # 1 hour
         )
-    
-    # First check if blog exists
-    blog = await db.blogs.find_one({"_id": ObjectId(blog_id)})
-    if not blog:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Blog not found"
-        )
-    
-    # Then check if user owns the blog
-    if str(blog["user_id"]) != current_user.id:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="You don't have permission to update images for this blog"
-        )
-    
-    # Check if images exist for this blog
-    existing_images = await db.images.find_one({"blog_id": ObjectId(blog_id)})
-    if not existing_images:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="No images found for this blog"
-        )
-    
-    # Update images
-    await db.images.update_one(
-        {"blog_id": ObjectId(blog_id)},
-        {
-            "$set": {
-                "image_url": image_data.image_url,
-                "uploaded_at": datetime.utcnow()
-            }
-        }
-    )
-    
-    updated_images = await db.images.find_one({"blog_id": ObjectId(blog_id)})
-    return ImageResponse(**updated_images)
-
-@router.delete("/blogs/{blog_id}")
-async def delete_blog_images(
-    blog_id: str,
-    current_user: UserInDB = Depends(get_current_user)
-):
-    db = await get_database()
-    
-    if not ObjectId.is_valid(blog_id):
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Invalid blog ID"
-        )
-    
-    # First check if blog exists
-    blog = await db.blogs.find_one({"_id": ObjectId(blog_id)})
-    if not blog:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Blog not found"
-        )
-    
-    # Then check if user owns the blog
-    if str(blog["user_id"]) != current_user.id:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="You don't have permission to delete images for this blog"
-        )
-    
-    result = await db.images.delete_one({"blog_id": ObjectId(blog_id)})
-    
-    if result.deleted_count == 0:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="No images found for this blog"
-        )
-    
-    return {"message": "Images deleted successfully"}
-
-@router.get("/my-images", response_model=List[ImageResponse])
-async def get_my_images(
-    current_user: UserInDB = Depends(get_current_user),
-    skip: int = Query(0, ge=0),
-    limit: int = Query(20, ge=1, le=100)
-):
-    """Get all images from user's blogs"""
-    db = await get_database()
-    
-    # First get all blog IDs belonging to the current user
-    user_blogs = await db.blogs.find({"user_id": ObjectId(current_user.id)}, {"_id": 1}).to_list(length=None)
-    blog_ids = [blog["_id"] for blog in user_blogs]
-    
-    if not blog_ids:
-        return []
-    
-    # Get images for user's blogs
-    cursor = db.images.find({"blog_id": {"$in": blog_ids}}).skip(skip).limit(limit).sort("uploaded_at", -1)
-    images = await cursor.to_list(length=limit)
-    
-    return [ImageResponse(**image) for image in images]
-
+        return SingleImageResponse(success=True, imageUrl=url)
+    except ClientError as e:
+        if e.response["Error"]["Code"] == "404":
+            raise HTTPException(status_code=404, detail="Image not found")
+        logger.error(f"Presign error: {e}")
+        raise HTTPException(status_code=500, detail="Error generating URL")

@@ -1,32 +1,49 @@
-from fastapi import APIRouter, HTTPException, status, Depends, Query
-from typing import List
-from models import TagCreate, TagResponse, UserInDB
+from fastapi import APIRouter, Body, HTTPException, status, Depends, Query
+from typing import List, Optional
+from models import MessageResponse, TagResponse, UserInDB
 from auth import get_current_user
 from database import get_database
 from bson import ObjectId
 
 router = APIRouter(prefix="/tags", tags=["tags"])
 
-@router.post("/", response_model=TagResponse)
-async def create_tag(tag: TagCreate, current_user: UserInDB = Depends(get_current_user)):
-    db = await get_database()
-    
-    # Check if tag already exists (case-insensitive)
-    existing_tag = await db.tags.find_one({"name": {"$regex": f"^{tag.name}$", "$options": "i"}})
-    if existing_tag:
+@router.post("/", response_model=MessageResponse)
+async def create_tags(
+    tag_names: List[str] = Body(default=[]),
+    current_user: UserInDB = Depends(get_current_user)
+):
+    if not tag_names:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Tag already exists"
+            detail="Tag list cannot be empty"
         )
+
+    db = await get_database()
+    tag_names = [name.lower() for name in tag_names]
+
+    # ✅ Only perform query if tag_names is not empty
+    existing_tags = await db.tags.find({
+        "$or": [{"name": {"$regex": f"^{name}$", "$options": "i"}} for name in tag_names]
+    }).to_list(None)
+
+    existing_names = {tag["name"].lower() for tag in existing_tags}
     
-    tag_dict = {
-        "name": tag.name.lower()  # Store tags in lowercase for consistency
-    }
-    
-    result = await db.tags.insert_one(tag_dict)
-    tag_dict["_id"] = str(result.inserted_id)
-    
-    return TagResponse(**tag_dict)
+    tags_to_insert = [
+        {"name": name}
+        for name in tag_names
+        if name.lower() not in existing_names
+    ]
+
+    if not tags_to_insert:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="All tags already exist"
+        )
+
+    await db.tags.insert_many(tags_to_insert)
+
+    return {"message": "Tags created successfully"}
+
 
 @router.get("/", response_model=List[TagResponse])
 async def get_all_tags(
@@ -86,7 +103,7 @@ async def get_tag(tag_id: str):
     
     return TagResponse(**tag)
 
-@router.delete("/{tag_id}")
+@router.delete("/{tag_id}") 
 async def delete_tag(tag_id: str, current_user: UserInDB = Depends(get_current_user)):
     db = await get_database()
     
@@ -117,20 +134,18 @@ async def delete_tag(tag_id: str, current_user: UserInDB = Depends(get_current_u
 
 @router.get("/popular/", response_model=List[dict])
 async def get_popular_tags(limit: int = Query(10, ge=1, le=50)):
-    """Get most popular tags based on usage in blogs"""
     db = await get_database()
     
-    # Aggregate pipeline to count tag usage
     pipeline = [
-        {"$unwind": "$tag_ids"},
-        {"$group": {"_id": "$tag_ids", "count": {"$sum": 1}}},
+        {"$unwind": "$tags"},  # Now unwinding the tags array (strings)
+        {"$group": {"_id": "$tags", "count": {"$sum": 1}}},  # Group by tag name
         {"$sort": {"count": -1}},
         {"$limit": limit},
         {
             "$lookup": {
                 "from": "tags",
-                "localField": "_id",
-                "foreignField": "_id",
+                "localField": "_id",  # Now matching tag name to tag collection
+                "foreignField": "name",
                 "as": "tag_info"
             }
         },
@@ -146,4 +161,3 @@ async def get_popular_tags(limit: int = Query(10, ge=1, le=50)):
     
     result = await db.blogs.aggregate(pipeline).to_list(length=limit)
     return result
-

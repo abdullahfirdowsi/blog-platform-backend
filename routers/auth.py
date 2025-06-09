@@ -1,6 +1,6 @@
 from fastapi import APIRouter, HTTPException, status, Depends, Response, Request
 from fastapi.security import HTTPAuthorizationCredentials
-from datetime import datetime
+from datetime import datetime, timezone
 from models import UserCreate, UserLogin, UserResponse, UserInDB
 from pydantic import BaseModel
 
@@ -58,7 +58,7 @@ async def register(user: UserCreate):
         "email": user.email,
         "password_hash": hashed_password,
         "refresh_token": None,
-        "created_at": datetime.utcnow()
+        "created_at": datetime.now(timezone.utc)
     }
     
     result = await db.users.insert_one(user_dict)

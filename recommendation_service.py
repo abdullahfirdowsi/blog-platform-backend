@@ -105,7 +105,10 @@ class BlogRecommendationService:
         if blog.get('published', False):
             score += 0.2
         
-        return score
+        likes_count = blog.get("likes_count", 0)
+        score += min(likes_count * 0.01, 0.3)
+        
+        return min(score, 1.0)
     
     async def get_all_blogs_sorted_by_interest(
         self, 
@@ -113,7 +116,7 @@ class BlogRecommendationService:
         page: int = 1, 
         page_size: int = 10,
         published_only: bool = True,
-        tag_id: Optional[str] = None
+        tags: Optional[str] = None
     ) -> Tuple[List[BlogRecommendationResponse], int]:
         """Get ALL blogs but sorted by user interest relevance"""
         db = await get_database()
@@ -122,29 +125,20 @@ class BlogRecommendationService:
         query_filter = {}
         if published_only:
             query_filter["published"] = True
-        if tag_id:
-            query_filter["tag_ids"] = ObjectId(tag_id)
+        if tags:
+            tags_list = [tag.strip().lower() for tag in tags.split(',') if tag.strip()]
+            if tags_list:
+                query_filter["tags"] = {"$in": tags_list}
         
         # Get all blogs matching the filter
         cursor = db.blogs.find(query_filter)
         all_blogs = await cursor.to_list(length=None)
         
-        # Get tag names for blogs
-        tag_ids = set()
-        for blog in all_blogs:
-            tag_ids.update(blog.get('tag_ids', []))
-        
-        tag_names_map = {}
-        if tag_ids:
-            tags_cursor = db.tags.find({"_id": {"$in": list(tag_ids)}})
-            tags = await tags_cursor.to_list(length=None)
-            tag_names_map = {tag['_id']: tag['name'] for tag in tags}
-        
         # Calculate recommendation scores for ALL blogs
         recommendations = []
         for blog in all_blogs:
             # Get tag names for this blog
-            blog_tag_names = [tag_names_map.get(tag_id, '') for tag_id in blog.get('tag_ids', [])]
+            blog_tag_names = blog.get('tags', [])
             
             if user_interests:
                 # Calculate content similarity based on user interests
@@ -164,19 +158,21 @@ class BlogRecommendationService:
                 # If no user interests, sort by engagement only (recency + published status)
                 total_score = self.calculate_engagement_score(blog)
             
-            # Create blog response with tag names and converted ObjectIds
+            # Create blog response with tag names
             blog_response_data = {
                 "_id": str(blog["_id"]),
                 "user_id": str(blog["user_id"]),
                 "title": blog.get("title", ""),
                 "content": blog.get("content", ""),
-                "tag_ids": [str(tag_id) for tag_id in blog.get("tag_ids", [])],
+                "tags": blog_tag_names,
                 "main_image_url": blog.get("main_image_url"),
                 "published": blog.get("published", False),
                 "created_at": blog.get("created_at"),
                 "updated_at": blog.get("updated_at"),
-                "tags": blog_tag_names
+                "comment_count": blog.get("comment_count", 0),
+                "likes_count": blog.get("likes_count", 0)
             }
+
             
             blog_response = BlogResponse(**blog_response_data)
             

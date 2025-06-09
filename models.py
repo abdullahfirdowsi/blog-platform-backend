@@ -39,21 +39,22 @@ class UserInDB(BaseModel):
     model_config = ConfigDict(
         populate_by_name=True,
         arbitrary_types_allowed=True,
-        json_encoders={ObjectId: str}
+        json_encoders={ObjectId: str},
+        extra="ignore"
     )
 
 # Blog Models
 class BlogCreate(BaseModel):
     title: str = Field(..., min_length=1, max_length=200)
     content: str = Field(..., min_length=1)
-    tag_ids: Optional[List[PyObjectId]] = []
+    tags: Optional[List[str]] = []
     main_image_url: Optional[str] = None
-    published: bool = False
+    published: bool = True
 
 class BlogUpdate(BaseModel):
     title: Optional[str] = Field(None, min_length=1, max_length=200)
     content: Optional[str] = Field(None, min_length=1)
-    tag_ids: Optional[List[PyObjectId]] = None
+    tags: Optional[List[str]] = None
     main_image_url: Optional[str] = None
     published: Optional[bool] = None
 
@@ -62,17 +63,18 @@ class BlogResponse(BaseModel):
     user_id: PyObjectId
     title: str
     content: str
-    tag_ids: List[PyObjectId] = []
+    tags: List[str] = []
     main_image_url: Optional[str] = None
     published: bool
     created_at: datetime
     updated_at: datetime
-    tags: Optional[List[str]] = []  # To store tag names for TF-IDF
+    comment_count: int = Field(default=0)
+    likes_count: int = Field(default=0)
     
     model_config = ConfigDict(
         populate_by_name=True,
         arbitrary_types_allowed=True,
-        json_encoders={ObjectId: str}
+        json_encoders={ObjectId: str},
     )
 
 class BlogInDB(BaseModel):
@@ -80,17 +82,35 @@ class BlogInDB(BaseModel):
     user_id: PyObjectId
     title: str
     content: str
-    tag_ids: List[PyObjectId] = []
+    tags: List[str] = []
     main_image_url: Optional[str] = None
     published: bool
     created_at: datetime
     updated_at: datetime
+    comment_count: Optional[int] = 0
+    likes_count: Optional[int] = 0
     
     model_config = ConfigDict(
         populate_by_name=True,
         arbitrary_types_allowed=True,
         json_encoders={ObjectId: str}
     )
+    
+#image models
+class SingleImageResponse(BaseModel):
+    success: bool
+    imageUrl: Optional[str] = None
+    message: Optional[str] = None
+
+class S3ImageInfo(BaseModel):
+    key: str
+    url: str
+    size: int
+    lastModified: str
+
+class S3ImagesListResponse(BaseModel):
+    success: bool
+    images: List[S3ImageInfo]
 
 # Comment Models
 class CommentCreate(BaseModel):
@@ -100,8 +120,10 @@ class CommentResponse(BaseModel):
     id: PyObjectId = Field(alias="_id")
     blog_id: PyObjectId
     user_id: PyObjectId
+    user_name: str
     text: str
     created_at: datetime
+    updated_at: Optional[datetime] = None
     
     model_config = ConfigDict(
         populate_by_name=True,
@@ -111,13 +133,13 @@ class CommentResponse(BaseModel):
 
 # Like Models
 class LikeCreate(BaseModel):
-    isLiked: bool = True
+    pass
 
 class LikeResponse(BaseModel):
     id: PyObjectId = Field(alias="_id")
     blog_id: PyObjectId
     user_id: PyObjectId
-    isLiked: bool
+    created_at: datetime
     
     model_config = ConfigDict(
         populate_by_name=True,
@@ -128,7 +150,6 @@ class LikeResponse(BaseModel):
 # Tag Models
 class TagCreate(BaseModel):
     name: str = Field(..., min_length=1, max_length=50)
-
 class TagResponse(BaseModel):
     id: PyObjectId = Field(alias="_id")
     name: str
@@ -138,22 +159,9 @@ class TagResponse(BaseModel):
         arbitrary_types_allowed=True,
         json_encoders={ObjectId: str}
     )
-
-# Image Models
-class ImageCreate(BaseModel):
-    image_url: List[str]
-
-class ImageResponse(BaseModel):
-    id: PyObjectId = Field(alias="_id")
-    blog_id: PyObjectId
-    image_url: List[str]
-    uploaded_at: datetime
     
-    model_config = ConfigDict(
-        populate_by_name=True,
-        arbitrary_types_allowed=True,
-        json_encoders={ObjectId: str}
-    )
+class MessageResponse(BaseModel):
+    message: str
 
 # User Interests Models
 class UserInterestsCreate(BaseModel):
@@ -174,8 +182,6 @@ class UserInterestsResponse(BaseModel):
         arbitrary_types_allowed=True,
         json_encoders={ObjectId: str}
     )
-
-# UserInterestsInDB removed - unnecessary duplication
 
 # Blog Recommendation Models
 class BlogRecommendationResponse(BaseModel):
