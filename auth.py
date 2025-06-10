@@ -98,3 +98,33 @@ async def get_current_user_optional(credentials: Optional[HTTPAuthorizationCrede
         return user
     except:
         return None
+
+import secrets
+from datetime import timedelta
+
+def generate_reset_token():
+    """Generate a secure random token for password reset"""
+    return secrets.token_urlsafe(32)
+
+def create_reset_token(email: str, expires_delta: Optional[timedelta] = None):
+    """Create a password reset token"""
+    to_encode = {"email": email, "type": "password_reset"}
+    if expires_delta:
+        expire = datetime.now() + expires_delta
+    else:
+        expire = datetime.now() + timedelta(hours=1)  # 1 hour expiry
+    to_encode.update({"exp": expire})
+    encoded_jwt = jwt.encode(to_encode, settings.SECRET_KEY, algorithm=settings.ALGORITHM)
+    return encoded_jwt
+
+def verify_reset_token(token: str):
+    """Verify password reset token"""
+    try:
+        payload = jwt.decode(token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM])
+        email: str = payload.get("email")
+        token_type: str = payload.get("type")
+        if email is None or token_type != "password_reset":
+            return None
+        return email
+    except JWTError:
+        return None

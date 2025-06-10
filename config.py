@@ -24,6 +24,13 @@ class Settings:
     GEMINI_MAX_TOKENS: int = config("GEMINI_MAX_TOKENS", default=2048, cast=int)
 
     ENVIRONMENT: str = config("ENVIRONMENT", default="development")
+    
+    # Email Settings
+    SMTP_SERVER: str = config("SMTP_SERVER", default="smtp.gmail.com")
+    SMTP_PORT: int = config("SMTP_PORT", default=587, cast=int)
+    SMTP_USERNAME: str = config("SMTP_USERNAME", default="")
+    SMTP_PASSWORD: str = config("SMTP_PASSWORD", default="")
+    FROM_EMAIL: str = config("FROM_EMAIL", default="")
 
 settings = Settings()
 

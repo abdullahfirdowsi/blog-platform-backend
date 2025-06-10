@@ -1,7 +1,7 @@
 from fastapi import APIRouter, HTTPException, status, Depends, Response, Request
 from fastapi.security import HTTPAuthorizationCredentials
-from datetime import datetime, timezone
-from models import UserCreate, UserLogin, UserResponse, UserInDB
+from datetime import datetime, timezone, timedelta
+from models import UserCreate, UserLogin, UserResponse, UserInDB, UsernameUpdate, ForgotPassword, ResetPassword, PasswordChange
 from pydantic import BaseModel, EmailStr
 
 class UserInfo(BaseModel):
@@ -30,8 +30,12 @@ from auth import (
     get_current_user,
     verify_token,
     get_user_by_email,
-    security
+    security,
+    create_reset_token,
+    verify_reset_token,
+    verify_password
 )
+from email_service import email_service
 from database import get_database
 from config import settings
 from bson import ObjectId
@@ -246,4 +250,155 @@ async def get_user_by_id(user_id: str):
         user_response["profile_picture"] = user["profile_picture"]
     
     return UserResponse(**user_response)
+
+async def update_username_handler(username_data: UsernameUpdate, current_user: UserInDB = Depends(get_current_user)):
+    """Update username for authenticated user only"""
+    db = await get_database()
+    
+    # Check if username is already taken by another user
+    existing_user = await db.users.find_one({
+        "username": username_data.username,
+        "_id": {"$ne": ObjectId(current_user.id)}
+    })
+    
+    if existing_user:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Username already taken"
+        )
+    
+    # Update username
+    await db.users.update_one(
+        {"_id": ObjectId(current_user.id)},
+        {"$set": {"username": username_data.username}}
+    )
+    
+    # Return updated user info
+    updated_user = await db.users.find_one({"_id": ObjectId(current_user.id)})
+    user_response = {
+        "_id": str(updated_user["_id"]),
+        "username": updated_user["username"],
+        "email": updated_user["email"],
+        "created_at": updated_user["created_at"]
+    }
+    
+    return UserResponse(**user_response)
+
+@router.patch("/update-username", response_model=UserResponse)
+async def update_username_patch(username_data: UsernameUpdate, current_user: UserInDB = Depends(get_current_user)):
+    return await update_username_handler(username_data, current_user)
+
+@router.put("/update-username", response_model=UserResponse)
+async def update_username_put(username_data: UsernameUpdate, current_user: UserInDB = Depends(get_current_user)):
+    return await update_username_handler(username_data, current_user)
+
+@router.post("/forgot-password")
+async def forgot_password(forgot_data: ForgotPassword):
+    """Send password reset email"""
+    db = await get_database()
+    
+    # Check if user exists
+    user = await db.users.find_one({"email": forgot_data.email})
+    
+    # Always return success message for security (don't reveal if email exists)
+    if not user:
+        return {"message": "If an account with that email exists, a password reset link has been sent."}
+    
+    # Generate reset token
+    reset_token = create_reset_token(forgot_data.email)
+    
+    # Store reset token in database (optional - for additional security)
+    await db.password_reset_tokens.delete_many({"email": forgot_data.email})  # Remove old tokens
+    await db.password_reset_tokens.insert_one({
+        "email": forgot_data.email,
+        "token": reset_token,
+        "created_at": datetime.now(),
+        "expires_at": datetime.now() + timedelta(hours=1),
+        "used": False
+    })
+    
+    # Send email
+    email_sent = await email_service.send_password_reset_email(
+        to_email=forgot_data.email,
+        reset_token=reset_token
+    )
+    
+    if email_sent:
+        return {"message": "If an account with that email exists, a password reset link has been sent."}
+    else:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to send password reset email. Please try again later."
+        )
+
+@router.post("/reset-password")
+async def reset_password(reset_data: ResetPassword):
+    """Reset password using token"""
+    db = await get_database()
+    
+    # Verify token
+    email = verify_reset_token(reset_data.token)
+    if not email:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid or expired reset token"
+        )
+    
+    # Check if token exists in database and is not used
+    token_doc = await db.password_reset_tokens.find_one({
+        "token": reset_data.token,
+        "email": email,
+        "used": False,
+        "expires_at": {"$gt": datetime.now()}
+    })
+    
+    if not token_doc:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid or expired reset token"
+        )
+    
+    # Get user
+    user = await db.users.find_one({"email": email})
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="User not found"
+        )
+    
+    # Update password
+    new_password_hash = get_password_hash(reset_data.new_password)
+    await db.users.update_one(
+        {"_id": user["_id"]},
+        {"$set": {"password_hash": new_password_hash, "refresh_token": None}}  # Invalidate all sessions
+    )
+    
+    # Mark token as used
+    await db.password_reset_tokens.update_one(
+        {"_id": token_doc["_id"]},
+        {"$set": {"used": True}}
+    )
+    
+    return {"message": "Password reset successfully. Please login with your new password."}
+
+@router.post("/change-password")
+async def change_password(password_data: PasswordChange, current_user: UserInDB = Depends(get_current_user)):
+    """Change password for authenticated user"""
+    db = await get_database()
+    
+    # Verify current password
+    if not verify_password(password_data.current_password, current_user.password_hash):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Current password is incorrect"
+        )
+    
+    # Update password
+    new_password_hash = get_password_hash(password_data.new_password)
+    await db.users.update_one(
+        {"_id": ObjectId(current_user.id)},
+        {"$set": {"password_hash": new_password_hash, "refresh_token": None}}  # Invalidate all sessions
+    )
+    
+    return {"message": "Password changed successfully. Please login again."}
 

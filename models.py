@@ -230,3 +230,36 @@ class Token(BaseModel):
 class TokenData(BaseModel):
     email: Optional[str] = None
 
+# User Update Models
+class UsernameUpdate(BaseModel):
+    username: str = Field(..., min_length=3, max_length=20)
+    
+    model_config = ConfigDict(
+        extra="ignore"  # Ignore extra fields from frontend
+    )
+
+class PasswordChange(BaseModel):
+    current_password: str
+    new_password: str = Field(..., min_length=6)
+
+class ForgotPassword(BaseModel):
+    email: EmailStr
+
+class ResetPassword(BaseModel):
+    token: str
+    new_password: str = Field(..., min_length=6)
+
+# Password Reset Token Model
+class PasswordResetToken(BaseModel):
+    id: PyObjectId = Field(alias="_id")
+    email: EmailStr
+    token: str
+    expires_at: datetime
+    used: bool = False
+    
+    model_config = ConfigDict(
+        populate_by_name=True,
+        arbitrary_types_allowed=True,
+        json_encoders={ObjectId: str}
+    )
+
