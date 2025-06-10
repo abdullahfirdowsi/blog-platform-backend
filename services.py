@@ -132,21 +132,15 @@ Summary:"""
     async def create_blog_summary(self, blog_id: str, blog_content: str, blog_title: str) -> BlogSummaryResponse:
         """Create and store a new blog summary"""
         try:
-            # Check if summary already exists
-            existing_summary = await self.db.blog_summaries.find_one({"blog_id": blog_id})
-            if existing_summary:
-                return BlogSummaryResponse(**existing_summary)
             # Generate AI summary
             summary_text = await self.generate_summary(blog_content, blog_title)
             # Create summary document
             summary_data = {
                 "blog_id": blog_id,
                 "summary": summary_text,
-                "created_at": datetime.utcnow()
+                "created_at": datetime.now()
             }
-            # Insert into database
-            result = await self.db.blog_summaries.insert_one(summary_data)
-            summary_data["_id"] = result.inserted_id
+            # return to ui
             return BlogSummaryResponse(**summary_data)
         except Exception as e:
             raise HTTPException(

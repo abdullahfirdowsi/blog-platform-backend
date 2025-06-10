@@ -230,3 +230,17 @@ class Token(BaseModel):
 class TokenData(BaseModel):
     email: Optional[str] = None
 
+# User Update Models
+class UsernameUpdate(BaseModel):
+    username: str = Field(..., min_length=3, max_length=20)
+ 
+class PasswordChange(BaseModel):
+    current_password: str
+    new_password: str = Field(..., min_length=6)
+ 
+class ForgotPassword(BaseModel):
+    email: EmailStr
+ 
+class ResetPassword(BaseModel):
+    token: str
+    new_password: str = Field(..., min_length=6)

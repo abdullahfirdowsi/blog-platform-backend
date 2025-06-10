@@ -1,14 +1,14 @@
 from fastapi import APIRouter, HTTPException, status, Depends
 from typing import List
 from datetime import datetime, timezone
-from models import LikeResponse, UserInDB
+from models import LikeResponse, MessageResponse, UserInDB
 from auth import get_current_user
 from database import get_database
 from bson import ObjectId
 
 router = APIRouter(prefix="/likes", tags=["likes"])
 
-@router.post("/blogs/{blog_id}", response_model=LikeResponse)
+@router.post("/blogs/{blog_id}", response_model=LikeResponse | MessageResponse)
 async def toggle_like(
     blog_id: str,
     current_user: UserInDB = Depends(get_current_user)

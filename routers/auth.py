@@ -1,7 +1,7 @@
 from fastapi import APIRouter, HTTPException, status, Depends, Response, Request
 from fastapi.security import HTTPAuthorizationCredentials
 from datetime import datetime, timezone
-from models import UserCreate, UserLogin, UserResponse, UserInDB
+from models import ForgotPassword, PasswordChange, ResetPassword, UserCreate, UserLogin, UserResponse, UserInDB, UsernameUpdate
 from pydantic import BaseModel, EmailStr
 
 class UserInfo(BaseModel):
@@ -28,6 +28,7 @@ from auth import (
     create_access_token, 
     create_refresh_token,
     get_current_user,
+    verify_password,
     verify_token,
     get_user_by_email,
     security
@@ -247,3 +248,64 @@ async def get_user_by_id(user_id: str):
     
     return UserResponse(**user_response)
 
+
+async def update_username_handler(username_data: UsernameUpdate, current_user: UserInDB = Depends(get_current_user)):
+    """Update username for authenticated user only"""
+    db = await get_database()
+   
+    # Check if username is already taken by another user
+    existing_user = await db.users.find_one({
+        "username": username_data.username,
+        "_id": {"$ne": ObjectId(current_user.id)}
+    })
+   
+    if existing_user:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Username already taken"
+        )
+   
+    # Update username
+    await db.users.update_one(
+        {"_id": ObjectId(current_user.id)},
+        {"$set": {"username": username_data.username}}
+    )
+   
+    # Return updated user info
+    updated_user = await db.users.find_one({"_id": ObjectId(current_user.id)})
+    user_response = {
+        "_id": str(updated_user["_id"]),
+        "username": updated_user["username"],
+        "email": updated_user["email"],
+        "created_at": updated_user["created_at"]
+    }
+   
+    return UserResponse(**user_response)
+ 
+ 
+@router.put("/update-username", response_model=UserResponse)
+async def update_username_put(username_data: UsernameUpdate, current_user: UserInDB = Depends(get_current_user)):
+    return await update_username_handler(username_data, current_user)
+ 
+ 
+@router.post("/change-password")
+async def change_password(password_data: PasswordChange, current_user: UserInDB = Depends(get_current_user)):
+    """Change password for authenticated user"""
+    db = await get_database()
+   
+    # Verify current password
+    if not verify_password(password_data.current_password, current_user.password_hash):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Current password is incorrect"
+        )
+   
+    # Update password
+    new_password_hash = get_password_hash(password_data.new_password)
+    await db.users.update_one(
+        {"_id": ObjectId(current_user.id)},
+        {"$set": {"password_hash": new_password_hash}}  # Invalidate all sessions
+    )
+   
+    return {"message": "Password changed successfully. Please login again."}
+ 
