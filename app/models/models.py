@@ -34,9 +34,12 @@ class UserInDB(BaseModel):
     id: PyObjectId = Field(alias="_id")
     username: str
     email: EmailStr
-    password_hash: str
+    password_hash: Optional[str] = None
     refresh_token: Optional[str] = None
     created_at: datetime
+    email_verified: bool = False
+    email_verification_token: Optional[str] = None
+    email_verification_token_expires: Optional[datetime] = None
 
     model_config = ConfigDict(
         populate_by_name=True,
@@ -257,3 +260,9 @@ class ForgotPassword(BaseModel):
 class ResetPassword(BaseModel):
     token: str
     new_password: str = Field(..., min_length=6)
+
+class EmailVerification(BaseModel):
+    token: str
+
+class ResendEmailVerification(BaseModel):
+    email: EmailStr

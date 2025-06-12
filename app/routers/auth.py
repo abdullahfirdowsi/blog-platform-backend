@@ -6,7 +6,8 @@ from pydantic import BaseModel, EmailStr
 
 from app.models.models import (
     ForgotPassword, PasswordChange, ResetPassword, UserCreate,
-    UserLogin, UserResponse, UserInDB, UsernameUpdate
+    UserLogin, UserResponse, UserInDB, UsernameUpdate,
+    EmailVerification, ResendEmailVerification
 )
 from app.core.auth import (
     get_password_hash, authenticate_user, create_access_token, create_refresh_token,
@@ -14,6 +15,11 @@ from app.core.auth import (
 )
 from app.db.database import get_database
 from app.core.config import settings
+from app.services.email_service import email_service
+from app.services.password_reset_service import (
+    generate_reset_token, validate_reset_token, clear_reset_token
+)
+from app.services.email_verification_service import email_verification_service
 
 router = APIRouter(prefix="/auth", tags=["authentication"])
 
@@ -38,10 +44,13 @@ class RefreshResponse(BaseModel):
     expires_in: int
     message: str
 
+class MessageResponse(BaseModel):
+    message: str
+
 
 # ==== ROUTES ====
 
-@router.post("/register", response_model=UserResponse)
+@router.post("/register")
 async def register(user: UserCreate):
     db = await get_database()
     
@@ -61,16 +70,32 @@ async def register(user: UserCreate):
         "email": normalized_email,
         "password_hash": hashed_password,
         "refresh_token": None,
-        "created_at": datetime.now()
+        "created_at": datetime.now(),
+        "email_verified": False,
+        "email_verification_token": None,
+        "email_verification_token_expires": None
     }
 
     result = await db.users.insert_one(user_dict)
-    return UserResponse(
-        _id=str(result.inserted_id),
-        username=normalized_username,
-        email=normalized_email,
-        created_at=user_dict["created_at"]
-    )
+    
+    # Generate and send email verification token
+    try:
+        verification_token = await email_verification_service.create_verification_token(normalized_email)
+        if verification_token:
+            await email_service.send_email_verification_email(normalized_email, verification_token)
+    except Exception as e:
+        # Log error but don't fail registration
+        print(f"Failed to send verification email: {str(e)}")
+    
+    return {
+        "message": "Registration successful! Please check your email to verify your account before logging in.",
+        "user": {
+            "id": str(result.inserted_id),
+            "username": normalized_username,
+            "email": normalized_email,
+            "email_verified": False
+        }
+    }
 
 
 @router.post("/login", response_model=LoginResponse)
@@ -81,6 +106,13 @@ async def login(user_credentials: UserLogin, response: Response):
             status_code=401,
             detail="Incorrect email or password",
             headers={"WWW-Authenticate": "Bearer"},
+        )
+    
+    # Check if email verification is required
+    if user == "email_not_verified":
+        raise HTTPException(
+            status_code=403,
+            detail="Please verify your email address before logging in. Check your inbox for a verification link."
         )
 
     access_token = create_access_token(data={"sub": user.email})
@@ -226,7 +258,7 @@ async def update_username(username_data: UsernameUpdate, current_user: UserInDB 
 async def change_password(password_data: PasswordChange, current_user: UserInDB = Depends(get_current_user)):
     db = await get_database()
 
-    if not verify_password(password_data.current_password, current_user.password_hash):
+    if not current_user.password_hash or not verify_password(password_data.current_password, current_user.password_hash):
         raise HTTPException(status_code=400, detail="Current password is incorrect")
 
     new_password_hash = get_password_hash(password_data.new_password)
@@ -236,3 +268,176 @@ async def change_password(password_data: PasswordChange, current_user: UserInDB 
     )
 
     return {"message": "Password changed successfully. Please login again."}
+
+
+@router.post("/forgot-password")
+async def forgot_password(forgot_password_data: ForgotPassword):
+    """Request a password reset token via email."""
+    db = await get_database()
+    
+    # Normalize email to lowercase
+    normalized_email = forgot_password_data.email.lower().strip()
+    
+    # Check if user exists
+    user = await db.users.find_one({"email": normalized_email})
+    if not user:
+        # Return error for unregistered email
+        raise HTTPException(
+            status_code=404,
+            detail="No account found with this email address. Please check your email or register for a new account."
+        )
+    try:
+        # Generate and save reset token
+        reset_token = await generate_reset_token(user["_id"])
+        
+        # Send password reset email
+        await email_service.send_password_reset_email(
+            to_email=normalized_email,
+            reset_token=reset_token
+        )
+        
+        return {"message": "If an account with that email exists, a password reset link has been sent."}
+    
+    except Exception as e:
+        # Log the error but don't expose it to the user
+        print(f"Error in forgot password: {str(e)}")
+        raise HTTPException(
+            status_code=500,
+            detail="An error occurred while processing your request. Please try again later."
+        )
+
+
+@router.post("/reset-password")
+async def reset_password(reset_password_data: ResetPassword):
+    """Reset password using a valid reset token."""
+    db = await get_database()
+    
+    try:
+        # Validate the reset token and get user ID
+        user_id = await validate_reset_token(reset_password_data.token)
+        
+        if not user_id:
+            raise HTTPException(
+                status_code=400,
+                detail="Invalid or expired reset token."
+            )
+        
+        # Hash the new password
+        new_password_hash = get_password_hash(reset_password_data.new_password)
+        
+        # Update user's password
+        result = await db.users.update_one(
+            {"_id": ObjectId(user_id)},
+            {"$set": {"password_hash": new_password_hash}}
+        )
+        
+        if result.modified_count == 0:
+            raise HTTPException(
+                status_code=404,
+                detail="User not found."
+            )
+        
+        # Clear the reset token
+        await clear_reset_token(user_id)
+        
+        # Optionally send success confirmation email
+        try:
+            user = await db.users.find_one({"_id": ObjectId(user_id)})
+            if user:
+                await email_service.send_password_reset_success_email(user["email"])
+        except Exception as e:
+            # Log the error but don't fail the password reset
+            print(f"Failed to send success email: {str(e)}")
+        
+        return {"message": "Password reset successfully. You can now login with your new password."}
+    
+    except HTTPException:
+        # Re-raise HTTP exceptions
+        raise
+    except Exception as e:
+        # Log the error but don't expose it to the user
+        print(f"Error in reset password: {str(e)}")
+        raise HTTPException(
+            status_code=500,
+            detail="An error occurred while resetting your password. Please try again later."
+        )
+
+
+@router.post("/verify-email")
+async def verify_email(verification_data: EmailVerification):
+    """Verify email address using verification token."""
+    try:
+        # Verify the email token
+        email = await email_verification_service.verify_email_token(verification_data.token)
+        
+        if not email:
+            raise HTTPException(
+                status_code=400,
+                detail="Invalid or expired verification token."
+            )
+        
+        # Send success confirmation email
+        try:
+            await email_service.send_email_verification_success_email(email)
+        except Exception as e:
+            # Log the error but don't fail the verification
+            print(f"Failed to send verification success email: {str(e)}")
+        
+        return {
+            "message": "Email verified successfully! You can now log in to your account.",
+            "email_verified": True
+        }
+    
+    except HTTPException:
+        # Re-raise HTTP exceptions
+        raise
+    except Exception as e:
+        # Log the error but don't expose it to the user
+        print(f"Error in email verification: {str(e)}")
+        raise HTTPException(
+            status_code=500,
+            detail="An error occurred while verifying your email. Please try again later."
+        )
+
+
+@router.post("/resend-verification")
+async def resend_verification_email(resend_data: ResendEmailVerification):
+    """Resend email verification email."""
+    db = await get_database()
+    
+    # Normalize email to lowercase
+    normalized_email = resend_data.email.lower().strip()
+    
+    # Check if user exists
+    user = await db.users.find_one({"email": normalized_email})
+    if not user:
+        raise HTTPException(
+            status_code=404,
+            detail="No account found with this email address."
+        )
+    
+    # Check if email is already verified
+    if user.get("email_verified", False):
+        raise HTTPException(
+            status_code=400,
+            detail="Email is already verified. You can log in to your account."
+        )
+    
+    try:
+        # Generate and send new verification token
+        verification_token = await email_verification_service.create_verification_token(normalized_email)
+        
+        if verification_token:
+            await email_service.send_email_verification_email(normalized_email, verification_token)
+        
+        return {
+            "message": "Verification email sent successfully. Please check your inbox."
+        }
+    
+    except Exception as e:
+        # Log the error but don't expose it to the user
+        print(f"Error in resending verification email: {str(e)}")
+        raise HTTPException(
+            status_code=500,
+            detail="An error occurred while sending the verification email. Please try again later."
+        )

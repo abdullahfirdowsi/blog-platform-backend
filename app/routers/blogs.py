@@ -43,8 +43,8 @@ async def create_blog(blog: BlogCreate, current_user: UserInDB = Depends(get_cur
         "tags": blog.tags,
         "main_image_url": blog.main_image_url,
         "published": blog.published,
-        "created_at": datetime.now(),
-        "updated_at": datetime.now(),
+        "created_at": datetime.now(timezone.utc),
+        "updated_at": datetime.now(timezone.utc),
         "comment_count": 0,
         "likes_count": 0
     }

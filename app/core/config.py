@@ -31,5 +31,16 @@ class Settings:
     # Environment
     ENVIRONMENT: str = config("ENVIRONMENT", default="development")
 
+    # Email Configuration
+    SMTP_HOST: str = config("SMTP_HOST", default="smtp.gmail.com")
+    SMTP_PORT: int = config("SMTP_PORT", default=587, cast=int)
+    SMTP_USERNAME: str = config("SMTP_USERNAME")
+    SMTP_PASSWORD: str = config("SMTP_PASSWORD")
+    EMAIL_FROM_NAME: str = config("EMAIL_FROM_NAME", default="Blog Platform")
+    EMAIL_FROM_ADDRESS: str = config("EMAIL_FROM_ADDRESS")
+    FRONTEND_URL: str = config("FRONTEND_URL")
+    RESET_TOKEN_EXPIRE_MINUTES: int = config("RESET_TOKEN_EXPIRE_MINUTES", default=30, cast=int)
+    EMAIL_VERIFICATION_TOKEN_EXPIRE_MINUTES: int = config("EMAIL_VERIFICATION_TOKEN_EXPIRE_MINUTES", default=1440, cast=int)  # 24 hours
+
 
 settings = Settings()
