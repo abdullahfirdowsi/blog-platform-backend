@@ -1,6 +1,6 @@
 from typing import Optional, List
 from datetime import datetime
-from pydantic import BaseModel, EmailStr, Field, ConfigDict
+from pydantic import BaseModel, EmailStr, Field, ConfigDict, field_validator
 from typing_extensions import Annotated
 from bson import ObjectId
 
@@ -13,6 +13,13 @@ class UserCreate(BaseModel):
     username: str = Field(..., min_length=3, max_length=100)
     email: EmailStr
     password: str = Field(..., min_length=6)
+    
+    @field_validator('username')
+    @classmethod
+    def validate_username(cls, v):
+        if ' ' in v:
+            raise ValueError('Username cannot contain spaces')
+        return v
 
 class UserLogin(BaseModel):
     email: EmailStr
@@ -252,6 +259,13 @@ class TokenData(BaseModel):
 
 class UsernameUpdate(BaseModel):
     username: str = Field(..., min_length=3, max_length=20)
+    
+    @field_validator('username')
+    @classmethod
+    def validate_username(cls, v):
+        if ' ' in v:
+            raise ValueError('Username cannot contain spaces')
+        return v
 
 class ProfilePictureUpdate(BaseModel):
     profile_picture: Optional[str] = None

@@ -238,9 +238,12 @@ async def get_user_by_id(user_id: str):
 @router.put("/update-username", response_model=UserResponse)
 async def update_username(username_data: UsernameUpdate, current_user: UserInDB = Depends(get_current_user)):
     db = await get_database()
+    
+    # Normalize username to lowercase and strip whitespace for consistency
+    normalized_username = username_data.username.lower().strip()
 
     existing_user = await db.users.find_one({
-        "username": username_data.username,
+        "username": normalized_username,
         "_id": {"$ne": ObjectId(current_user.id)}
     })
     if existing_user:
@@ -248,7 +251,7 @@ async def update_username(username_data: UsernameUpdate, current_user: UserInDB 
 
     await db.users.update_one(
         {"_id": ObjectId(current_user.id)},
-        {"$set": {"username": username_data.username}}
+        {"$set": {"username": normalized_username}}
     )
 
     updated_user = await db.users.find_one({"_id": ObjectId(current_user.id)})
