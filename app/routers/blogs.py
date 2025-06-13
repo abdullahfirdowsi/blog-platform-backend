@@ -38,7 +38,7 @@ async def create_blog(blog: BlogCreate, current_user: UserInDB = Depends(get_cur
     blog_dict = {
         "user_id": ObjectId(current_user.id),
         "title": blog.title,
-        "username":current_user.email,
+        "username": current_user.username,
         "content": blog.content,
         "tags": blog.tags,
         "main_image_url": blog.main_image_url,

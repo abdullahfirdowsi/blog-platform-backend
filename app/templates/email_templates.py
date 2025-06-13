@@ -216,7 +216,7 @@ def get_password_reset_email_template(reset_link: str) -> str:
 def get_email_verification_template(verification_link: str) -> str:
     """
     Get the HTML template for email verification
-    Modern design with gradient header and structured layout
+    Modern design with purple gradient header matching the provided design
     """
     return f"""
 <!DOCTYPE html>
@@ -224,7 +224,7 @@ def get_email_verification_template(verification_link: str) -> str:
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Verify Your Email - {settings.EMAIL_FROM_NAME}</title>
+    <title>Verify Your Email - Blog Platform</title>
     <style>
         * {{
             margin: 0;
@@ -249,7 +249,7 @@ def get_email_verification_template(verification_link: str) -> str:
             border: 1px solid rgba(75, 85, 99, 0.3);
         }}
         .header {{
-            background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             padding: 40px 30px;
             text-align: center;
             position: relative;
@@ -294,7 +294,7 @@ def get_email_verification_template(verification_link: str) -> str:
         .verify-button {{
             display: inline-block;
             padding: 16px 32px;
-            background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             color: #ffffff !important;
             text-decoration: none;
             border-radius: 12px;
@@ -302,12 +302,12 @@ def get_email_verification_template(verification_link: str) -> str:
             font-size: 16px;
             margin: 20px 0;
             transition: all 0.3s ease;
-            box-shadow: 0 4px 15px rgba(16, 185, 129, 0.2);
+            box-shadow: 0 4px 15px rgba(102, 126, 234, 0.2);
             border: none;
         }}
         .verify-button:hover {{
             transform: translateY(-2px);
-            box-shadow: 0 8px 25px rgba(16, 185, 129, 0.3);
+            box-shadow: 0 8px 25px rgba(102, 126, 234, 0.3);
         }}
         .link-fallback {{
             margin: 20px 0;
@@ -322,19 +322,19 @@ def get_email_verification_template(verification_link: str) -> str:
             font-size: 14px;
         }}
         .link-text {{
-            color: #10b981;
+            color: #667eea;
             word-break: break-all;
             font-size: 14px;
         }}
         .warning {{
-            background: rgba(245, 158, 11, 0.1);
-            border: 1px solid rgba(245, 158, 11, 0.3);
+            background: rgba(239, 68, 68, 0.1);
+            border: 1px solid rgba(239, 68, 68, 0.3);
             border-radius: 8px;
             padding: 16px;
             margin: 20px 0;
         }}
         .warning p {{
-            color: #fbbf24;
+            color: #fca5a5;
             margin: 0;
             font-size: 14px;
             font-weight: 500;
@@ -381,18 +381,19 @@ def get_email_verification_template(verification_link: str) -> str:
         <div class="header">
             <div class="logo">
                 <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
-                    <path d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                    <rect width="20" height="16" x="2" y="4" rx="2" stroke="white" stroke-width="2" fill="none"/>
+                    <path d="m2 7 8.586 5.586a2 2 0 0 0 2.828 0L22 7" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
                 </svg>
             </div>
             <h1>Verify Your Email</h1>
-            <p>Welcome to {settings.EMAIL_FROM_NAME}!</p>
+            <p>Welcome to Blog Platform!</p>
         </div>
         
         <div class="content">
             <div class="greeting">Hello there!</div>
             
             <div class="message">
-                Thank you for registering with {settings.EMAIL_FROM_NAME}! To complete your account setup and start using our platform, please verify your email address.
+                Thank you for registering with Blog Platform! To complete your account setup and start using our platform, please verify your email address.
             </div>
             
             <div style="text-align: center; margin: 30px 0;">
@@ -405,7 +406,7 @@ def get_email_verification_template(verification_link: str) -> str:
             </div>
             
             <div class="warning">
-                <p>⚠️ This verification link will expire in {settings.EMAIL_VERIFICATION_TOKEN_EXPIRE_MINUTES // 60} hours for your security.</p>
+                <p>⚠️ This verification link will expire in 24 hours for your security.</p>
             </div>
             
             <div class="security-note">
@@ -414,9 +415,9 @@ def get_email_verification_template(verification_link: str) -> str:
         </div>
         
         <div class="footer">
-            <p><strong>{settings.EMAIL_FROM_NAME}</strong></p>
+            <p><strong>Blog Platform</strong></p>
             <p>This is an automated email. Please do not reply to this message.</p>
-            <p>© 2025 {settings.EMAIL_FROM_NAME}. All rights reserved.</p>
+            <p>© 2025 Blog Platform. All rights reserved.</p>
         </div>
     </div>
 </body>
