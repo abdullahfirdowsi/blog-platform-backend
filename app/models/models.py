@@ -20,6 +20,13 @@ class UserCreate(BaseModel):
         if ' ' in v:
             raise ValueError('Username cannot contain spaces')
         return v
+    
+    @field_validator('email')
+    @classmethod
+    def validate_email_format(cls, v):
+        if not v or '@' not in str(v):
+            raise ValueError('Please enter a valid email address (e.g., user@example.com)')
+        return v
 
 class UserLogin(BaseModel):
     email: EmailStr
