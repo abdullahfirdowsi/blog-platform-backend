@@ -224,7 +224,7 @@ def get_email_verification_template(verification_link: str) -> str:
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Verify Your Email - Blog Platform</title>
+    <title>Verify Your Email - {settings.EMAIL_FROM_NAME}</title>
     <style>
         * {{
             margin: 0;
