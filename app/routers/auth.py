@@ -6,7 +6,7 @@ from pydantic import BaseModel, EmailStr
 
 from app.models.models import (
     ForgotPassword, PasswordChange, ResetPassword, UserCreate,
-    UserLogin, UserResponse, UserInDB, UsernameUpdate,
+    UserLogin, UserResponse, UserInDB, UsernameUpdate, ProfilePictureUpdate,
     EmailVerification, ResendEmailVerification
 )
 from app.core.auth import (
@@ -30,6 +30,7 @@ class UserInfo(BaseModel):
     id: str
     username: str
     email: EmailStr
+    profile_picture: str | None = None
 
 class LoginResponse(BaseModel):
     access_token: str
@@ -136,7 +137,7 @@ async def login(user_credentials: UserLogin, response: Response):
         token_type="bearer",
         expires_in=settings.ACCESS_TOKEN_EXPIRE_MINUTES * 60,
         message="Login successful",
-        user=UserInfo(id=str(user.id), username=user.username, email=user.email)
+        user=UserInfo(id=str(user.id), username=user.username, email=user.email, profile_picture=user.profile_picture)
     )
 
 
@@ -202,7 +203,13 @@ async def logout(request: Request, response: Response, current_user: UserInDB = 
 
 @router.get("/me", response_model=UserResponse)
 async def read_users_me(current_user: UserInDB = Depends(get_current_user)):
-    return UserResponse(**current_user.dict())
+    return UserResponse(
+        _id=current_user.id,
+        username=current_user.username,
+        email=current_user.email,
+        created_at=current_user.created_at,
+        profile_picture=current_user.profile_picture
+    )
 
 
 @router.get("/users/{user_id}", response_model=UserResponse)
@@ -222,7 +229,6 @@ async def get_user_by_id(user_id: str):
         "username": user["username"],
         "email": user["email"],
         "created_at": user["created_at"],
-        "full_name": user.get("full_name"),
         "profile_picture": user.get("profile_picture")
     }
 
@@ -250,7 +256,33 @@ async def update_username(username_data: UsernameUpdate, current_user: UserInDB 
         _id=str(updated_user["_id"]),
         username=updated_user["username"],
         email=updated_user["email"],
-        created_at=updated_user["created_at"]
+        created_at=updated_user["created_at"],
+        profile_picture=updated_user.get("profile_picture")
+    )
+
+
+@router.put("/update-profile-picture", response_model=UserResponse)
+async def update_profile_picture(profile_data: ProfilePictureUpdate, current_user: UserInDB = Depends(get_current_user)):
+    """Update user's profile picture URL"""
+    db = await get_database()
+
+    # Update the profile picture in the database
+    update_data = {"profile_picture": profile_data.profile_picture}
+    
+    await db.users.update_one(
+        {"_id": ObjectId(current_user.id)},
+        {"$set": update_data}
+    )
+
+    # Fetch the updated user
+    updated_user = await db.users.find_one({"_id": ObjectId(current_user.id)})
+    
+    return UserResponse(
+        _id=str(updated_user["_id"]),
+        username=updated_user["username"],
+        email=updated_user["email"],
+        created_at=updated_user["created_at"],
+        profile_picture=updated_user.get("profile_picture")
     )
 
 

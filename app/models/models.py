@@ -23,6 +23,7 @@ class UserResponse(BaseModel):
     username: str
     email: EmailStr
     created_at: datetime
+    profile_picture: Optional[str] = None
 
     model_config = ConfigDict(
         populate_by_name=True,
@@ -40,6 +41,7 @@ class UserInDB(BaseModel):
     email_verified: bool = False
     email_verification_token: Optional[str] = None
     email_verification_token_expires: Optional[datetime] = None
+    profile_picture: Optional[str] = None
 
     model_config = ConfigDict(
         populate_by_name=True,
@@ -68,6 +70,7 @@ class BlogResponse(BaseModel):
     id: PyObjectId = Field(alias="_id")
     user_id: PyObjectId
     username: Optional[str] = None
+    profile_picture: Optional[str] = None
     title: str
     content: str
     tags: List[str] = []
@@ -249,6 +252,9 @@ class TokenData(BaseModel):
 
 class UsernameUpdate(BaseModel):
     username: str = Field(..., min_length=3, max_length=20)
+
+class ProfilePictureUpdate(BaseModel):
+    profile_picture: Optional[str] = None
 
 class PasswordChange(BaseModel):
     current_password: str

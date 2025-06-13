@@ -88,11 +88,12 @@ async def get_blogs(
 
     blogs = await blogs_cursor.to_list(length=page_size)
 
-    # Add username to each blog
+    # Add username and profile_picture to each blog
     for blog in blogs:
         blog = convert_objectid_to_str(blog)
-        user = await db.users.find_one({"_id": ObjectId(blog["user_id"])}, {"username": 1})
+        user = await db.users.find_one({"_id": ObjectId(blog["user_id"])}, {"username": 1, "profile_picture": 1})
         blog["username"] = user["username"] if user else "Unknown"
+        blog["profile_picture"] = user.get("profile_picture") if user else None
 
     return PaginatedBlogsResponse(
         blogs=blogs,
@@ -121,6 +122,7 @@ async def get_my_blogs(
             _id=str(blog["_id"]),
             user_id=str(blog["user_id"]),
             username=current_user.username,  # Inject username here
+            profile_picture=current_user.profile_picture,  # Inject profile picture here
             title=blog.get("title", ""),
             content=blog.get("content", ""),
             tags=blog.get("tags", []),
@@ -150,9 +152,10 @@ async def get_blog(blog_id: str):
     blog["_id"] = str(blog["_id"])
     blog["user_id"] = str(blog["user_id"])
 
-    # Fetch author's username
-    author = await db.users.find_one({"_id": ObjectId(blog["user_id"])}, {"username": 1})
+    # Fetch author's username and profile_picture
+    author = await db.users.find_one({"_id": ObjectId(blog["user_id"])}, {"username": 1, "profile_picture": 1})
     blog["username"] = author["username"] if author else "Unknown"
+    blog["profile_picture"] = author.get("profile_picture") if author else None
 
     return BlogResponse(**blog)
 
@@ -257,8 +260,9 @@ async def search_blogs(
 
     recommendations = []
     for blog in blogs:
-        author = await db.users.find_one({"_id": blog["user_id"]})
+        author = await db.users.find_one({"_id": blog["user_id"]}, {"username": 1, "profile_picture": 1})
         username = author.get("username") if author else "Unknown"
+        profile_picture = author.get("profile_picture") if author else None
 
         content_score = recommendation_service.calculate_content_similarity(
             user_interests, blog.get('content', ''), blog.get('title', ''), blog.get('tags', [])
@@ -273,6 +277,7 @@ async def search_blogs(
                     _id=str(blog["_id"]),
                     user_id=str(blog["user_id"]),
                     username=username,
+                    profile_picture=profile_picture,
                     title=blog.get("title", ""),
                     content=blog.get("content", ""),
                     tags=blog.get("tags", []),
