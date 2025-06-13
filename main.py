@@ -138,7 +138,7 @@ async def validation_exception_handler(request: Request, exc: RequestValidationE
 # Configure CORS
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:4200","http://127.0.0.1:4200","https://blogplatformapplicationilink.netlify.app"],  # Read from .env
+    allow_origins=["http://localhost:4200","http://127.0.0.1:4200","https://blogplatformapplicationilink.netlify.app", "https://blog-platform-frontend-deployment.vercel.app"],  # Read from .env
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
