@@ -1,4 +1,4 @@
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import List
 from decouple import config
 
@@ -43,7 +43,7 @@ class Settings:
     EMAIL_VERIFICATION_TOKEN_EXPIRE_MINUTES: int = config("EMAIL_VERIFICATION_TOKEN_EXPIRE_MINUTES", default=1440, cast=int)  # 24 hours
 
     # CORS Configuration
-    CORS_ORIGINS: List[str] = config("CORS_ORIGINS", default="http://localhost:4200,http://127.0.0.1:4200", cast=lambda v: [s.strip() for s in v.split(',')])
+    CORS_ORIGINS: List[str] = field(default_factory=lambda: config("CORS_ORIGINS", default="http://localhost:4200,http://127.0.0.1:4200", cast=lambda v: [s.strip() for s in v.split(',')]))
 
 
 settings = Settings()
