@@ -42,5 +42,8 @@ class Settings:
     RESET_TOKEN_EXPIRE_MINUTES: int = config("RESET_TOKEN_EXPIRE_MINUTES", default=30, cast=int)
     EMAIL_VERIFICATION_TOKEN_EXPIRE_MINUTES: int = config("EMAIL_VERIFICATION_TOKEN_EXPIRE_MINUTES", default=1440, cast=int)  # 24 hours
 
+    # CORS Configuration
+    CORS_ORIGINS: List[str] = config("CORS_ORIGINS", default="http://localhost:4200,http://127.0.0.1:4200", cast=lambda v: [s.strip() for s in v.split(',')])
+
 
 settings = Settings()
