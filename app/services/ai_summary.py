@@ -6,7 +6,6 @@ from datetime import datetime
 from typing import Optional
 
 from fastapi import HTTPException
-from motor.motor_asyncio import AsyncIOMotorDatabase
 import google.generativeai as genai
 
 from app.models.models import BlogSummaryResponse
@@ -15,9 +14,7 @@ from app.core.config import settings
 logger = logging.getLogger(__name__)
 
 class AIService:
-    def __init__(self, db: AsyncIOMotorDatabase):
-        self.db = db
-
+    def __init__(self):
         # Configure Gemini AI
         api_key = getattr(settings, 'GEMINI_API_KEY', None) or os.getenv("GEMINI_API_KEY")
         if not api_key:
@@ -115,18 +112,3 @@ Summary:
         except Exception as e:
             raise HTTPException(status_code=500, detail=f"Error creating blog summary: {str(e)}")
 
-    async def get_blog_summary(self, blog_id: str) -> Optional[BlogSummaryResponse]:
-        """Fetch blog summary from DB"""
-        try:
-            summary = await self.db.blog_summaries.find_one({"blog_id": blog_id})
-            return BlogSummaryResponse(**summary) if summary else None
-        except Exception as e:
-            raise HTTPException(status_code=500, detail=f"Error retrieving blog summary: {str(e)}")
-
-    async def delete_blog_summary(self, blog_id: str) -> bool:
-        """Delete a blog summary from DB"""
-        try:
-            result = await self.db.blog_summaries.delete_one({"blog_id": blog_id})
-            return result.deleted_count > 0
-        except Exception as e:
-            raise HTTPException(status_code=500, detail=f"Error deleting blog summary: {str(e)}")
