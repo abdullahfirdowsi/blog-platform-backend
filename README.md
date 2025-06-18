@@ -948,6 +948,12 @@ This project is licensed under the MIT License - see the [LICENSE](../LICENSE) f
 
 ## 🚀 Recent Updates
 
+### v2.0.1 - Bug Fixes & Improvements
+- 🏷️ **Tag Filtering Fix**: Fixed case sensitivity issue in blog tag filtering
+  - Backend now performs case-insensitive tag filtering for consistent results
+  - Resolved issue where tags with different cases (e.g., "Python" vs "python") wouldn't match properly
+  - Improved user experience when filtering blogs by tags
+
 ### v2.0.0 - Enhanced Email & AI Features
 - ✨ **Professional Email System**: Beautiful HTML templates with responsive design
 - 🔐 **Enhanced Security**: Mandatory email verification, secure password reset
