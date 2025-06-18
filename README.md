@@ -1,12 +1,14 @@
 # BlogPlatform Backend API 🚀
 
-> High-performance Python backend with AI-powered features, ML recommendations, and enterprise-grade security.
+> High-performance Python backend with AI-powered features, ML recommendations, enterprise-grade security, and comprehensive email services.
 
 [![FastAPI](https://img.shields.io/badge/FastAPI-005571?style=for-the-badge&logo=fastapi)](https://fastapi.tiangolo.com/)
 [![Python](https://img.shields.io/badge/Python-3776AB?style=for-the-badge&logo=python&logoColor=white)](https://www.python.org/)
 [![MongoDB](https://img.shields.io/badge/MongoDB-4EA94B?style=for-the-badge&logo=mongodb&logoColor=white)](https://www.mongodb.com/)
 [![JWT](https://img.shields.io/badge/JWT-000000?style=for-the-badge&logo=JSON%20web%20tokens&logoColor=white)](https://jwt.io/)
 [![AWS](https://img.shields.io/badge/AWS-232F3E?style=for-the-badge&logo=amazon-aws&logoColor=white)](https://aws.amazon.com/)
+[![Google AI](https://img.shields.io/badge/Google_AI-4285F4?style=for-the-badge&logo=google&logoColor=white)](https://ai.google.dev/)
+[![scikit-learn](https://img.shields.io/badge/scikit--learn-F7931E?style=for-the-badge&logo=scikit-learn&logoColor=white)](https://scikit-learn.org/)
 
 ## 📋 Table of Contents
 
@@ -29,11 +31,13 @@ BlogPlatform Backend is a modern, high-performance REST API built with FastAPI, 
 ### 🎯 Why This Backend?
 
 - **🔥 Performance**: Async/await architecture with 10x faster response times
-- **🧠 AI-Powered**: Google Gemini integration for content analysis
-- **🔒 Enterprise Security**: JWT + refresh token rotation, bcrypt hashing
+- **🧠 AI-Powered**: Google Gemini integration for intelligent blog summarization
+- **🔒 Enterprise Security**: JWT + refresh token rotation, bcrypt hashing, email verification
+- **📧 Email Services**: Professional email templates, SMTP integration, verification & password reset
 - **📈 Scalable**: Microservice-ready architecture with horizontal scaling
-- **🤖 ML Recommendations**: TF-IDF vectorization with cosine similarity
+- **🤖 ML Recommendations**: Advanced TF-IDF vectorization with cosine similarity engine
 - **☁️ Cloud Native**: AWS S3 integration, MongoDB Atlas ready
+- **👤 User Management**: Profile pictures, comprehensive user preferences
 
 ## 🌟 Key Features
 
@@ -45,17 +49,22 @@ BlogPlatform Backend is a modern, high-performance REST API built with FastAPI, 
 - **Error Handling**: Structured error responses with proper HTTP status codes
 
 ### 🔐 Authentication & Security
-- **JWT Authentication**: Short-lived access tokens (30 min) + long-lived refresh tokens (15 days)
+- **JWT Authentication**: Short-lived access tokens (30 min) + long-lived refresh tokens (7 days)
+- **Email Verification**: Mandatory email verification before account activation
+- **Password Reset**: Secure token-based password recovery with email confirmation
 - **HTTP-Only Cookies**: Secure refresh token storage
 - **Password Security**: Bcrypt hashing with salt
 - **CORS Protection**: Configurable cross-origin resource sharing
-- **Input Sanitization**: Protection against injection attacks
+- **Input Sanitization**: Comprehensive validation with Pydantic models
+- **Token Security**: Automatic token rotation and invalidation
 
 ### 🤖 AI & Machine Learning
-- **Content Recommendations**: ML-powered blog discovery using TF-IDF and cosine similarity
-- **AI Summarization**: Automatic blog summaries with Google Gemini AI
-- **User Interest Tracking**: Personalized content based on reading behavior
-- **Engagement Analytics**: Smart scoring combining content relevance and social signals
+- **Intelligent Blog Summarization**: Google Gemini AI generates concise 2-3 sentence summaries
+- **Advanced Content Recommendations**: ML-powered discovery using TF-IDF vectorization
+- **Smart Similarity Engine**: Cosine similarity with n-gram analysis and content weighting
+- **User Interest Profiling**: Personalized content based on user preferences and behavior
+- **Engagement Analytics**: Multi-factor scoring (recency, engagement, content relevance)
+- **Text Processing**: Advanced preprocessing with stop-word removal and keyword extraction
 
 ### 📊 Data Management
 - **MongoDB Integration**: Async operations with Motor driver
@@ -64,9 +73,17 @@ BlogPlatform Backend is a modern, high-performance REST API built with FastAPI, 
 - **Pagination**: Memory-efficient data loading
 
 ### ☁️ Cloud Integration
-- **AWS S3**: Scalable image storage and management
-- **Google AI**: Gemini API for content analysis
-- **Environment Management**: Flexible configuration for different environments
+- **AWS S3**: Scalable image storage with metadata management
+- **Google AI**: Gemini 1.5 Flash for intelligent content analysis
+- **Email Services**: SMTP integration with Gmail and custom providers
+- **Environment Management**: Flexible configuration for development/production
+
+### 📧 Email System
+- **Professional Templates**: Modern HTML email templates with responsive design
+- **Email Verification**: Automated account verification with secure tokens
+- **Password Recovery**: Secure password reset with token expiration
+- **Success Notifications**: Confirmation emails for security actions
+- **SMTP Integration**: Support for Gmail, custom SMTP servers
 
 ## 🏗️ Architecture
 
@@ -83,6 +100,12 @@ BlogPlatform Backend is a modern, high-performance REST API built with FastAPI, 
 ┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐
 │  Google Gemini  │    │   ML Pipeline   │    │   JWT Service   │
 │   AI Service    │    │  Recommendations│    │  Authentication │
+└─────────────────┘    └─────────────────┘    └─────────────────┘
+         │                       │                       │
+         ▼                       ▼                       ▼
+┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐
+│  Email Service  │    │   TF-IDF Engine │    │ Token Security  │
+│  SMTP/Templates │    │ Cosine Similarity│    │ Verification   │
 └─────────────────┘    └─────────────────┘    └─────────────────┘
 ```
 
@@ -111,10 +134,15 @@ backend/
 │   │   ├── images.py           # Image handling (S3)
 │   │   ├── interests.py        # User interests
 │   │   └── summaries.py        # AI summarization
-│   └── services/               # Business logic
+│   ├── services/               # Business logic
 │       ├── __init__.py
-│       ├── services.py         # Core services
-│       └── recommendation_service.py  # ML recommendations
+│       ├── ai_summary.py       # Google Gemini AI summarization
+│       ├── email_service.py    # SMTP email services
+│       ├── email_verification_service.py  # Email verification logic
+│       ├── password_reset_service.py      # Password reset handling
+│       └── recommendation_service.py      # ML recommendation engine
+│   └── templates/              # Email templates
+│       └── email_templates.py  # Professional HTML email templates
 ├── main.py                     # Application entry point
 ├── requirements.txt            # Python dependencies
 ├── .env.example               # Environment template
@@ -128,13 +156,13 @@ backend/
 
 | Collection | Purpose | Key Features |
 |------------|---------|-------------|
-| `users` | User accounts | JWT refresh tokens, bcrypt passwords |
-| `blogs` | Blog posts | Block-based content, tags, engagement metrics |
-| `comments` | Comment threads | User references, timestamps |
-| `likes` | Engagement tracking | User-blog relationships |
-| `tags` | Content categorization | Auto-creation, search indexing |
-| `images` | Media management | S3 metadata, blog associations |
-| `user_interests` | ML personalization | Interest tracking for recommendations |
+| `users` | User accounts | JWT refresh tokens, bcrypt passwords, email verification |
+| `blogs` | Blog posts | Block-based content, tags, engagement metrics, AI summaries |
+| `comments` | Comment threads | User references, timestamps, threaded discussions |
+| `likes` | Engagement tracking | User-blog relationships, like counts |
+| `tags` | Content categorization | Auto-creation, search indexing, ML features |
+| `images` | Media management | S3 metadata, blog associations, profile pictures |
+| `user_interests` | ML personalization | Interest tracking, recommendation algorithms |
 
 ## 🚀 Quick Start
 
@@ -165,6 +193,18 @@ source venv/bin/activate
 
 ```bash
 # Install all dependencies
+# Key Dependencies:
+# - fastapi==0.115.12          # High-performance web framework
+# - uvicorn==0.34.3            # ASGI server
+# - motor==3.7.1               # Async MongoDB driver
+# - python-jose==3.5.0         # JWT token handling
+# - passlib==1.7.4             # Password hashing
+# - google-generativeai==0.8.5 # Google Gemini AI
+# - scikit-learn==1.6.1        # ML for recommendations
+# - boto3==1.38.32             # AWS S3 integration
+# - pydantic==2.11.5           # Data validation
+# - python-multipart==0.0.20   # File upload support
+
 pip install -r requirements.txt
 
 # Verify installation
@@ -174,8 +214,8 @@ pip list | grep fastapi
 ### 3. Environment Configuration
 
 ```bash
-# Copy environment template
-copy .env.example .env
+# Create .env file with required configurations
+# See configuration section below for all required variables
 
 # Edit .env with your configurations
 notepad .env  # Windows
@@ -224,13 +264,27 @@ AWS_SECRET_ACCESS_KEY=your-aws-secret-access-key
 AWS_REGION=us-east-1
 S3_BUCKET_NAME=your-s3-bucket-name
 
-# Google Gemini AI
+# Google Gemini AI Configuration
 GEMINI_API_KEY=your-google-gemini-api-key
 GEMINI_MODEL=gemini-1.5-flash
 GEMINI_TEMPERATURE=0.7
 GEMINI_TOP_P=0.8
 GEMINI_TOP_K=40
 GEMINI_MAX_TOKENS=2048
+
+# Email Configuration (SMTP)
+SMTP_HOST=smtp.gmail.com
+SMTP_PORT=587
+SMTP_USERNAME=your-email@gmail.com
+SMTP_PASSWORD=your-app-password
+EMAIL_FROM_NAME=Blog Platform
+EMAIL_FROM_ADDRESS=your-email@gmail.com
+FRONTEND_URL=http://localhost:4200
+RESET_TOKEN_EXPIRE_MINUTES=15
+EMAIL_VERIFICATION_TOKEN_EXPIRE_MINUTES=1440
+
+# CORS Configuration
+CORS_ORIGINS=http://localhost:4200,http://127.0.0.1:4200
 
 # Environment
 ENVIRONMENT=development
@@ -281,8 +335,14 @@ POST   /api/v1/auth/login          # User login
 POST   /api/v1/auth/refresh        # Token refresh
 POST   /api/v1/auth/logout         # User logout
 GET    /api/v1/auth/me             # Current user profile
-PUT    /api/v1/auth/update-username # Update username
-POST   /api/v1/auth/change-password # Change password
+PUT    /api/v1/auth/update-username     # Update username
+PUT    /api/v1/auth/update-profile-picture # Update profile picture
+POST   /api/v1/auth/change-password     # Change password
+POST   /api/v1/auth/forgot-password     # Request password reset
+POST   /api/v1/auth/reset-password      # Reset password with token
+POST   /api/v1/auth/verify-email        # Verify email address
+POST   /api/v1/auth/resend-verification # Resend verification email
+GET    /api/v1/auth/users/{user_id}     # Get public user profile
 ```
 
 #### 📝 Blog Management
@@ -330,7 +390,7 @@ DELETE /api/v1/images/blogs/{blog_id} # Delete images
 
 ```http
 # AI Summarization
-POST   /api/v1/summaries/           # Generate blog summary
+POST   /api/v1/summaries/           # Generate intelligent blog summary
 
 # User Interests (for ML recommendations)
 GET    /api/v1/interests/           # Get user interests
@@ -354,13 +414,12 @@ Content-Type: application/json
 
 # Response
 {
-  "access_token": "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9...",
-  "token_type": "bearer",
+  "message": "Registration successful! Please check your email to verify your account before logging in.",
   "user": {
     "id": "507f1f77bcf86cd799439011",
     "username": "john_doe",
     "email": "john@example.com",
-    "created_at": "2024-01-15T10:30:00Z"
+    "email_verified": false
   }
 }
 ```
@@ -402,43 +461,145 @@ Content-Type: application/json
 ### Google Gemini AI Service
 
 ```python
-# app/services/services.py
+# app/services/ai_summary.py
 class AIService:
-    def __init__(self, db):
-        self.db = db
-        self.gemini_client = genai.GenerativeModel(settings.GEMINI_MODEL)
+    def __init__(self):
+        genai.configure(api_key=settings.GEMINI_API_KEY)
+        self.model = genai.GenerativeModel(model_name="gemini-1.5-flash")
+        self.generation_config = {
+            "temperature": 0.7,
+            "top_p": 0.8,
+            "top_k": 40,
+            "max_output_tokens": 150
+        }
     
-    async def create_blog_summary(self, blog_content: str) -> str:
-        """Generate AI-powered blog summary"""
-        prompt = f"Summarize this blog post in 2-3 sentences: {blog_content}"
-        response = await self.gemini_client.generate_content(prompt)
-        return response.text
+    def extract_text_from_blog_content(self, content: str) -> str:
+        """Extract plain text from structured blog content (JSON)"""
+        # Handles JSON blocks, removes HTML tags, processes lists
+        # Returns clean text for AI processing
+    
+    async def generate_summary(self, blog_content: str, blog_title: str) -> str:
+        """Generate intelligent AI-powered summary using Gemini"""
+        text_content = self.extract_text_from_blog_content(blog_content)
+        prompt = f"""
+Please provide a concise summary of the following blog post in 2-3 sentences.
+Focus on the main points and key takeaways.
+
+Title: {blog_title}
+Content: {text_content}
+
+Summary:
+"""
+        response = self.model.generate_content(prompt, generation_config=self.generation_config)
+        return response.text.strip()
 ```
 
-### ML Recommendation Engine
+### Advanced ML Recommendation Engine
 
 ```python
 # app/services/recommendation_service.py
 class BlogRecommendationService:
+    def __init__(self):
+        self.stop_words = {
+            'a', 'an', 'and', 'are', 'as', 'at', 'be', 'by', 'for', 'from',
+            # ... comprehensive stop words list
+        }
+    
+    def preprocess_text(self, text: str) -> str:
+        """Advanced text preprocessing with stop-word removal"""
+        text = text.lower()
+        text = re.sub(r'[^a-zA-Z\s]', '', text)  # Remove special chars
+        words = [word for word in text.split() 
+                if word not in self.stop_words and len(word) > 2]
+        return ' '.join(words)
+    
     def calculate_content_similarity(self, user_interests: List[str], 
-                                   blog_content: str) -> float:
-        """Calculate similarity using TF-IDF and cosine similarity"""
+                                   blog_content: str, blog_title: str, 
+                                   blog_tags: List[str]) -> float:
+        """Advanced similarity calculation with weighted content"""
+        user_profile = ' '.join(user_interests)
+        
+        # Weight title and tags more heavily
+        blog_document = f"{blog_title} {blog_title} {blog_content} {' '.join(blog_tags)} {' '.join(blog_tags)}"
+        
+        # Preprocess both documents
+        user_profile_clean = self.preprocess_text(user_profile)
+        blog_document_clean = self.preprocess_text(blog_document)
+        
         vectorizer = TfidfVectorizer(
             max_features=1000,
-            ngram_range=(1, 2),
+            ngram_range=(1, 2),  # Unigrams and bigrams
             min_df=1,
             max_df=0.8
         )
         
-        # Create document vectors
-        user_profile = ' '.join(user_interests)
-        documents = [user_profile, blog_content]
+        documents = [user_profile_clean, blog_document_clean]
         tfidf_matrix = vectorizer.fit_transform(documents)
+        similarity = cosine_similarity(tfidf_matrix[0:1], tfidf_matrix[1:2])[0][0]
         
-        # Calculate cosine similarity
-        similarity = cosine_similarity(tfidf_matrix[0:1], tfidf_matrix[1:2])
-        return float(similarity[0][0])
+        return float(similarity)
+    
+    def calculate_engagement_score(self, blog: dict) -> float:
+        """Multi-factor engagement scoring"""
+        score = 0.0
+        
+        # Recency bonus
+        days_old = (datetime.now() - blog.get('created_at', datetime.now())).days
+        if days_old < 1: score += 0.3
+        elif days_old < 7: score += 0.2
+        elif days_old < 30: score += 0.1
+        
+        # Published status and likes
+        if blog.get('published', False): score += 0.2
+        score += min(blog.get("likes_count", 0) * 0.01, 0.3)
+        
+        return min(score, 1.0)
 ```
+
+## 📧 Email System
+
+### Professional Email Templates
+
+The backend includes a comprehensive email system with modern, responsive HTML templates:
+
+```python
+# app/services/email_service.py
+class EmailService:
+    async def send_email_verification_email(self, to_email: str, verification_token: str):
+        """Send beautiful email verification with professional template"""
+        verification_link = f"{settings.FRONTEND_URL}/auth/verify-email?token={verification_token}"
+        html_template = get_email_verification_template(verification_link)
+        return await self.send_email(to_email, "Verify Your Email", html_template, is_html=True)
+    
+    async def send_password_reset_email(self, to_email: str, reset_token: str):
+        """Send password reset email with secure token"""
+        reset_link = f"{settings.FRONTEND_URL}/auth/reset-password?token={reset_token}"
+        html_template = get_password_reset_email_template(reset_link)
+        return await self.send_email(to_email, "Password Reset Request", html_template, is_html=True)
+```
+
+### Email Features
+
+- **Responsive Design**: Mobile-friendly HTML templates with gradient headers
+- **Security Tokens**: Secure token generation with expiration times
+- **Professional Styling**: Modern dark theme matching the application design
+- **Fallback Support**: Plain text versions for all HTML emails
+- **SMTP Integration**: Support for Gmail, Outlook, and custom SMTP servers
+
+### Email Verification Flow
+
+1. **Registration**: User registers, email verification token generated
+2. **Email Sent**: Professional verification email with secure link
+3. **Verification**: User clicks link, email verified, account activated
+4. **Confirmation**: Success email sent confirming verification
+
+### Password Reset Flow
+
+1. **Request**: User requests password reset
+2. **Token Generation**: Secure reset token created (15-minute expiry)
+3. **Email Delivery**: Professional reset email with secure link
+4. **Reset**: User resets password, token invalidated
+5. **Confirmation**: Success email confirming password change
 
 ## 🔒 Security
 
@@ -483,12 +644,15 @@ def verify_password(plain_password: str, hashed_password: str) -> bool:
 
 ### Security Best Practices
 
-- ✅ **Input Validation**: All inputs validated with Pydantic models
+- ✅ **Input Validation**: Comprehensive validation with Pydantic models
+- ✅ **Email Verification**: Mandatory email verification before account access
+- ✅ **Token Security**: Secure token generation with hashing and expiration
+- ✅ **Password Security**: Bcrypt hashing with salt, secure reset flow
 - ✅ **SQL Injection Prevention**: MongoDB with proper query building
 - ✅ **XSS Protection**: Content sanitization and validation
-- ✅ **CORS Configuration**: Specific origin allowlist
-- ✅ **Rate Limiting**: Built-in FastAPI rate limiting
-- ✅ **HTTPS Ready**: Secure cookie configuration for production
+- ✅ **CORS Configuration**: Configurable origin allowlist
+- ✅ **Cookie Security**: HTTP-only, secure, SameSite cookie configuration
+- ✅ **Token Rotation**: Automatic refresh token rotation and invalidation
 
 ### Environment-Specific Security
 
@@ -779,6 +943,18 @@ For backend-specific issues:
 ## 📄 License
 
 This project is licensed under the MIT License - see the [LICENSE](../LICENSE) file for details.
+
+---
+
+## 🚀 Recent Updates
+
+### v2.0.0 - Enhanced Email & AI Features
+- ✨ **Professional Email System**: Beautiful HTML templates with responsive design
+- 🔐 **Enhanced Security**: Mandatory email verification, secure password reset
+- 🤖 **Advanced AI**: Intelligent blog summarization with Google Gemini 1.5
+- 📈 **Improved ML**: Enhanced recommendation engine with advanced text processing
+- 👤 **User Profiles**: Profile picture management and enhanced user features
+- 🎨 **Professional Templates**: Modern email designs matching application theme
 
 ---
 
