@@ -17,7 +17,7 @@ async def connect_to_mongo():
     """Create database connection"""
     try:
         db.client = AsyncIOMotorClient(settings.MONGODB_URL, serverSelectionTimeoutMS=5000)
-        db.database = db.client.get_database("blogging")  # You can replace with settings.MONGODB_NAME if needed
+        db.database = db.client.get_database("blogging")  
 
         # Test the connection
         await db.client.server_info()
