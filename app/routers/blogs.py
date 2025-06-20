@@ -104,6 +104,40 @@ async def get_blogs(
     )
 
 
+@router.get("/debug/my-posts", response_model=List[BlogResponse])
+async def debug_my_posts(current_user: UserInDB = Depends(get_current_user)):
+    """Debug endpoint to check all posts regardless of status"""
+    db = await get_database()
+    
+    # Find all posts by the user without any filters
+    cursor = db.blogs.find({"user_id": ObjectId(current_user.id)})
+    blogs = await cursor.to_list(length=None)
+    
+    # Log the results for debugging
+    print(f"Found {len(blogs)} posts for user {current_user.id}")
+    for blog in blogs:
+        print(f"Blog ID: {blog['_id']}, Title: {blog['title']}, Published: {blog.get('published', True)}")
+    
+    return [
+        BlogResponse(
+            _id=str(blog["_id"]),
+            user_id=str(blog["user_id"]),
+            username=current_user.username,
+            profile_picture=current_user.profile_picture,
+            title=blog.get("title", ""),
+            content=blog.get("content", ""),
+            tags=blog.get("tags", []),
+            main_image_url=blog.get("main_image_url"),
+            published=blog.get("published", True),  # Default to True for old posts
+            created_at=blog.get("created_at"),
+            updated_at=blog.get("updated_at"),
+            comment_count=blog.get("comment_count", 0),
+            likes_count=blog.get("likes_count", 0)
+        )
+        for blog in blogs
+    ]
+
+
 @router.get("/my-blogs", response_model=List[BlogResponse])
 async def get_my_blogs(
     current_user: UserInDB = Depends(get_current_user),

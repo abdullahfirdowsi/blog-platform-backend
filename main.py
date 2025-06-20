@@ -81,10 +81,16 @@ app.add_exception_handler(RequestValidationError, validation_exception_handler)
 # Configure CORS
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # Temporarily allowing all origins
+    allow_origins=[
+        "http://localhost:4200",
+        "http://127.0.0.1:4200",
+        "https://blog-platform-web-application.vercel.app",
+        "https://blogplatformapplicationilink.netlify.app"
+    ],
     allow_credentials=True,
-    allow_methods=["*"],
+    allow_methods=["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
     allow_headers=["*"],
+    expose_headers=["*"]
 )
 
 # Register Routers
