@@ -286,6 +286,13 @@ EMAIL_VERIFICATION_TOKEN_EXPIRE_MINUTES=1440
 # CORS Configuration
 CORS_ORIGINS=http://localhost:4200,http://127.0.0.1:4200
 
+# To temporarily allow all origins for development/testing:
+CORS_ORIGINS=*
+
+Note: Using '*' allows requests from any origin. This should only be used during development 
+or testing and never in production environments. For production, always specify exact origins:
+CORS_ORIGINS=https://your-frontend.com,https://admin.your-frontend.com
+
 # Environment
 ENVIRONMENT=development
 ```
@@ -650,7 +657,7 @@ def verify_password(plain_password: str, hashed_password: str) -> bool:
 - ✅ **Password Security**: Bcrypt hashing with salt, secure reset flow
 - ✅ **SQL Injection Prevention**: MongoDB with proper query building
 - ✅ **XSS Protection**: Content sanitization and validation
-- ✅ **CORS Configuration**: Configurable origin allowlist
+- ✅ **CORS Configuration**: Configurable origin allowlist with support for development mode ('*')
 - ✅ **Cookie Security**: HTTP-only, secure, SameSite cookie configuration
 - ✅ **Token Rotation**: Automatic refresh token rotation and invalidation
 
