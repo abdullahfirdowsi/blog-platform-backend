@@ -52,14 +52,20 @@ async def get_all_tags(
     Retrieve all tags with pagination.
     """
     db = await get_database()
-
-    cursor = db.tags.find({}).skip(skip).limit(limit).sort("name", 1)
-    tags = await cursor.to_list(length=limit)
-
-    for tag in tags:
-        tag["_id"] = str(tag["_id"])
-
-    return [TagResponse(**tag) for tag in tags]
+    
+    try:
+        cursor = db.tags.find({}).skip(skip).limit(limit).sort("name", 1)
+        tags = await cursor.to_list(length=limit)
+        
+        for tag in tags:
+            tag["_id"] = str(tag["_id"])
+        
+        return [TagResponse(**tag) for tag in tags]
+    except Exception as e:
+        # Handle case where collection doesn't exist or other DB errors
+        print(f"Error retrieving tags: {str(e)}")
+        # Return empty list instead of 404
+        return []
 
 
 @router.get("/search/{query}", response_model=List[TagResponse])
@@ -72,16 +78,22 @@ async def search_tags(
     Search for tags by name (case-insensitive).
     """
     db = await get_database()
+    
+    try:
+        search_filter = {"name": {"$regex": query, "$options": "i"}}
 
-    search_filter = {"name": {"$regex": query, "$options": "i"}}
+        cursor = db.tags.find(search_filter).skip(skip).limit(limit).sort("name", 1)
+        tags = await cursor.to_list(length=limit)
 
-    cursor = db.tags.find(search_filter).skip(skip).limit(limit).sort("name", 1)
-    tags = await cursor.to_list(length=limit)
+        for tag in tags:
+            tag["_id"] = str(tag["_id"])
 
-    for tag in tags:
-        tag["_id"] = str(tag["_id"])
-
-    return [TagResponse(**tag) for tag in tags]
+        return [TagResponse(**tag) for tag in tags]
+    except Exception as e:
+        # Handle case where collection doesn't exist or other DB errors
+        print(f"Error searching tags: {str(e)}")
+        # Return empty list instead of 404
+        return []
 
 
 @router.get("/{tag_id}", response_model=TagResponse)
@@ -136,29 +148,35 @@ async def get_popular_tags(limit: int = Query(10, ge=1, le=50)):
     Get the most popular tags based on blog usage.
     """
     db = await get_database()
-
-    pipeline = [
-        {"$unwind": "$tags"},
-        {"$group": {"_id": "$tags", "count": {"$sum": 1}}},
-        {"$sort": {"count": -1}},
-        {"$limit": limit},
-        {
-            "$lookup": {
-                "from": "tags",
-                "localField": "_id",
-                "foreignField": "name",
-                "as": "tag_info"
+    
+    try:
+        pipeline = [
+            {"$unwind": "$tags"},
+            {"$group": {"_id": "$tags", "count": {"$sum": 1}}},
+            {"$sort": {"count": -1}},
+            {"$limit": limit},
+            {
+                "$lookup": {
+                    "from": "tags",
+                    "localField": "_id",
+                    "foreignField": "name",
+                    "as": "tag_info"
+                }
+            },
+            {"$unwind": "$tag_info"},
+            {
+                "$project": {
+                    "_id": {"$toString": "$tag_info._id"},
+                    "name": "$tag_info.name",
+                    "usage_count": "$count"
+                }
             }
-        },
-        {"$unwind": "$tag_info"},
-        {
-            "$project": {
-                "_id": {"$toString": "$tag_info._id"},
-                "name": "$tag_info.name",
-                "usage_count": "$count"
-            }
-        }
-    ]
+        ]
 
-    result = await db.blogs.aggregate(pipeline).to_list(length=limit)
-    return result
+        result = await db.blogs.aggregate(pipeline).to_list(length=limit)
+        return result
+    except Exception as e:
+        # Handle case where collections don't exist or other DB errors
+        print(f"Error retrieving popular tags: {str(e)}")
+        # Return empty list instead of 404
+        return []

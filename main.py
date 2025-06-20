@@ -36,30 +36,16 @@ app = FastAPI(
     redoc_url="/redoc",
     openapi_url="/openapi.json",
     root_path="",
-    redirect_slashes=False,  # Disable automatic slash redirects
+    # Enable FastAPI's built-in trailing slash handling
     openapi_prefix=""  # Ensure OpenAPI schema uses correct paths
 )
 
 # Add trusted host middleware
 app.add_middleware(TrustedHostMiddleware, allowed_hosts=["*"])
 
-# Base middleware for consistent route handling
+# Base middleware for handling request schemes
 @app.middleware("http")
-async def route_handler_middleware(request: Request, call_next):
-    # Don't modify paths for OpenAPI documentation
-    if request.url.path in ["/docs", "/redoc", "/openapi.json"]:
-        return await call_next(request)
-    
-    path = request.url.path
-    original_path = path
-    
-    # Handle trailing slashes more gracefully
-    if path != "/" and path.endswith("/"):
-        path = path.rstrip("/")
-        # Only modify if it's an API endpoint
-        if path.startswith("/api/"):
-            request.scope["path"] = path
-    
+async def request_scheme_middleware(request: Request, call_next):
     # Ensure the scheme is properly set
     if "x-forwarded-proto" in request.headers:
         request.scope["scheme"] = request.headers["x-forwarded-proto"]
@@ -67,12 +53,6 @@ async def route_handler_middleware(request: Request, call_next):
         request.scope["scheme"] = request.headers["x-scheme"]
     
     response = await call_next(request)
-    
-    # If we get a 404 and we modified the path, try the original path
-    if response.status_code == 404 and original_path != path:
-        request.scope["path"] = original_path
-        response = await call_next(request)
-    
     return response
 
 # Register custom exception handler for validation errors

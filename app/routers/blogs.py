@@ -70,38 +70,50 @@ async def get_blogs(
 ):
     db = await get_database()
 
-    filters = {}
-    if published_only:
-        filters["published"] = True
+    try:
+        filters = {}
+        if published_only:
+            filters["published"] = True
 
-    if tags:
-        tag_list = [tag.strip() for tag in tags.split(",")]
-        filters["tags"] = {"$in": tag_list}
+        if tags:
+            tag_list = [tag.strip() for tag in tags.split(",")]
+            filters["tags"] = {"$in": tag_list}
 
-    skip = (page - 1) * page_size
-    total = await db.blogs.count_documents(filters)
+        skip = (page - 1) * page_size
+        total = await db.blogs.count_documents(filters)
 
-    blogs_cursor = db.blogs.find(filters)\
-        .sort("created_at", -1)\
-        .skip(skip)\
-        .limit(page_size)
+        blogs_cursor = db.blogs.find(filters)\
+            .sort("created_at", -1)\
+            .skip(skip)\
+            .limit(page_size)
 
-    blogs = await blogs_cursor.to_list(length=page_size)
+        blogs = await blogs_cursor.to_list(length=page_size)
 
-    # Add username and profile_picture to each blog
-    for blog in blogs:
-        blog = convert_objectid_to_str(blog)
-        user = await db.users.find_one({"_id": ObjectId(blog["user_id"])}, {"username": 1, "profile_picture": 1})
-        blog["username"] = user["username"] if user else "Unknown"
-        blog["profile_picture"] = user.get("profile_picture") if user else None
+        # Add username and profile_picture to each blog
+        for blog in blogs:
+            blog = convert_objectid_to_str(blog)
+            user = await db.users.find_one({"_id": ObjectId(blog["user_id"])}, {"username": 1, "profile_picture": 1})
+            blog["username"] = user["username"] if user else "Unknown"
+            blog["profile_picture"] = user.get("profile_picture") if user else None
 
-    return PaginatedBlogsResponse(
-        blogs=blogs,
-        total=total,
-        page=page,
-        limit=page_size,
-        total_pages=(total + page_size - 1) // page_size
-    )
+        return PaginatedBlogsResponse(
+            blogs=blogs,
+            total=total,
+            page=page,
+            limit=page_size,
+            total_pages=(total + page_size - 1) // page_size
+        )
+    except Exception as e:
+        # Handle case where collection doesn't exist or other DB errors
+        print(f"Error retrieving blogs: {str(e)}")
+        # Return empty result instead of 404
+        return PaginatedBlogsResponse(
+            blogs=[],
+            total=0,
+            page=page,
+            limit=page_size,
+            total_pages=0
+        )
 
 
 @router.get("/debug/my-posts", response_model=List[BlogResponse])
