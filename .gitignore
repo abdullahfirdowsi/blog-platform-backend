@@ -1,0 +1,55 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Virtual environment
+venv/
+env/
+.venv/
+ENV/
+.env/
+
+# Environment variables
+.env
+.env.*
+
+# VS Code settings
+.vscode/
+
+# macOS system files
+.DS_Store
+
+# Windows system files
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+
+# Logs
+*.log
+
+# Pip dependency file locks
+pip-log.txt
+pip-delete-this-directory.txt
+
+# PyInstaller
+*.spec
+dist/
+build/
+
+# Test/coverage
+.coverage
+htmlcov/
+.tox/
+.nox/
+pytest_cache/
+.cache
+
+# MyPy / Pylint / Pyright
+.mypy_cache/
+.pyright/
+.pytest_cache/
+
+# Local S3 cache or boto credentials
+.aws/
+
